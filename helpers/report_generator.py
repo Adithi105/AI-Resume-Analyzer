@@ -25,7 +25,6 @@ def generate_pdf_report(resume_data: Dict[str, Any], jd_match_data: Optional[Dic
 
     styles = getSampleStyleSheet()
     
-    # Custom styles
     title_style = ParagraphStyle(
         'DocTitle',
         parent=styles['Heading1'],
@@ -261,6 +260,162 @@ def generate_pdf_report(resume_data: Dict[str, Any], jd_match_data: Optional[Dic
             else:
                 story.append(Paragraph(f"• {edu}", body_style))
             story.append(Spacer(1, 3))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def generate_improved_resume_pdf(improved_data: Dict[str, Any], candidate_name: str = "Candidate") -> bytes:
+    """
+    Generates a publication-grade ATS-optimized PDF resume for the rewritten candidate profile.
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=40,
+        leftMargin=40,
+        topMargin=40,
+        bottomMargin=40
+    )
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'ImpTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=24,
+        leading=28,
+        textColor=colors.HexColor('#0F172A'),
+        spaceAfter=4
+    )
+
+    section_style = ParagraphStyle(
+        'ImpSection',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=13,
+        leading=16,
+        textColor=colors.HexColor('#2563EB'),
+        spaceBefore=12,
+        spaceAfter=4
+    )
+
+    body_style = ParagraphStyle(
+        'ImpBody',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9.5,
+        leading=13,
+        textColor=colors.HexColor('#334155')
+    )
+
+    bold_label = ParagraphStyle(
+        'ImpBold',
+        parent=body_style,
+        fontName='Helvetica-Bold'
+    )
+
+    story = []
+
+    # Title Banner
+    story.append(Paragraph(f"{candidate_name} - ATS Optimized Resume", title_style))
+    story.append(Paragraph("AI-Rewritten Executive Resume & Professional Highlights", styles['Normal']))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#2563EB'), spaceAfter=14))
+
+    # Professional Summary
+    prof_sum = improved_data.get("Professional_Summary")
+    if prof_sum:
+        story.append(Paragraph("Professional Summary", section_style))
+        story.append(Paragraph(prof_sum, body_style))
+        story.append(Spacer(1, 10))
+
+    # Skills
+    skills = improved_data.get("Skills", [])
+    if skills:
+        story.append(Paragraph("Technical & Core Competencies", section_style))
+        skills_text = " • ".join(skills) if isinstance(skills, list) else str(skills)
+        story.append(Paragraph(skills_text, body_style))
+        story.append(Spacer(1, 10))
+
+    # Experience
+    exp_list = improved_data.get("Experience", [])
+    if exp_list:
+        story.append(Paragraph("Professional Experience", section_style))
+        for exp in exp_list:
+            if isinstance(exp, dict):
+                comp = exp.get("Company", "Company")
+                role = exp.get("Role", "Role")
+                dur = exp.get("Duration", "")
+                header = f"<b>{role}</b> - {comp}"
+                if dur:
+                    header += f" ({dur})"
+                story.append(Paragraph(header, bold_label))
+
+                bullets = exp.get("Bullet_Points") or exp.get("Description") or []
+                if isinstance(bullets, list):
+                    for b in bullets:
+                        story.append(Paragraph(f"• {b}", body_style))
+                elif bullets:
+                    story.append(Paragraph(f"• {bullets}", body_style))
+            else:
+                story.append(Paragraph(f"• {exp}", body_style))
+            story.append(Spacer(1, 6))
+        story.append(Spacer(1, 8))
+
+    # Key Projects
+    proj_list = improved_data.get("Projects", [])
+    if proj_list:
+        story.append(Paragraph("Key Technical Projects", section_style))
+        for proj in proj_list:
+            if isinstance(proj, dict):
+                title = proj.get("Title", "Project")
+                tech = proj.get("TechStack", "")
+                header = f"<b>{title}</b>"
+                if tech:
+                    header += f" [{tech}]"
+                story.append(Paragraph(header, bold_label))
+
+                bullets = proj.get("Bullet_Points") or proj.get("Description") or []
+                if isinstance(bullets, list):
+                    for b in bullets:
+                        story.append(Paragraph(f"• {b}", body_style))
+                elif bullets:
+                    story.append(Paragraph(f"• {bullets}", body_style))
+            else:
+                story.append(Paragraph(f"• {proj}", body_style))
+            story.append(Spacer(1, 6))
+        story.append(Spacer(1, 8))
+
+    # Achievements
+    achievements = improved_data.get("Achievements", [])
+    if achievements:
+        story.append(Paragraph("Quantified Key Achievements", section_style))
+        for a in achievements:
+            story.append(Paragraph(f"🏆 {a}", body_style))
+        story.append(Spacer(1, 10))
+
+    # Education
+    edu_list = improved_data.get("Education", [])
+    if edu_list:
+        story.append(Paragraph("Education Credentials", section_style))
+        for edu in edu_list:
+            if isinstance(edu, dict):
+                deg = edu.get("Degree", "Degree")
+                inst = edu.get("Institution", "")
+                session = edu.get("Session", "")
+                high = edu.get("Highlights") or edu.get("Description") or ""
+                header = f"<b>{deg}</b> - {inst}"
+                if session:
+                    header += f" ({session})"
+                story.append(Paragraph(header, body_style))
+                if high:
+                    story.append(Paragraph(f"• {high}", body_style))
+            else:
+                story.append(Paragraph(f"• {edu}", body_style))
+            story.append(Spacer(1, 4))
 
     doc.build(story)
     buffer.seek(0)

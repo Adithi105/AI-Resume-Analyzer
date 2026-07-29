@@ -4,8 +4,10 @@ from helpers.json_validator import (
     parse_and_clean_json,
     sanitize_resume_data,
     sanitize_jd_match_data,
+    sanitize_rewrite_data,
     DEFAULT_RESUME_SCHEMA,
-    DEFAULT_JD_MATCH_SCHEMA
+    DEFAULT_JD_MATCH_SCHEMA,
+    DEFAULT_REWRITE_SCHEMA
 )
 
 MODEL_NAME = "llama3.2:3b"
@@ -14,8 +16,7 @@ def analyze_resume(resume_text: str) -> Dict[str, Any]:
     """
     Analyzes extracted resume text using Ollama (Llama 3.2 3B) acting as an Intelligent
     ATS Recruiter. Evaluates candidate metrics and returns weighted ATS sub-scores across
-    8 categories (Skills, Projects, Education, Experience, Certifications, Formatting,
-    Keyword Match, Readability) and 16 recruiter intelligence metrics in structured JSON.
+    8 categories and 16 recruiter intelligence metrics in structured JSON.
     """
     if not resume_text or not resume_text.strip():
         return sanitize_resume_data({"error": "Empty resume text."})
@@ -103,9 +104,8 @@ Return ONLY a valid raw JSON object matching this exact structure:
 
 CRITICAL INSTRUCTIONS:
 1. Return strictly raw valid JSON. Do NOT use markdown ```json wrappers or introductory text.
-2. Provide numeric values (0-100) for all 8 categories in ATS_Breakdown (Skills_Score, Experience_Score, Projects_Score, Keyword_Match_Score, Education_Score, Formatting_Score, Certifications_Score, Readability_Score).
+2. Provide numeric values (0-100) for all 8 categories in ATS_Breakdown.
 3. Recruiter_Verdict must be one of: "Strong Hire", "Shortlist / Interview", "Borderline Candidate", or "Reject / Re-align".
-4. Hiring_Probability must be a percentage string (e.g., "85%").
 
 CANDIDATE RESUME TEXT:
 {resume_text}
@@ -124,7 +124,6 @@ CANDIDATE RESUME TEXT:
         return sanitized
 
     except Exception as e:
-        # Retry without format="json" if ollama server format enforcement errored
         try:
             response = ollama.chat(
                 model=MODEL_NAME,
@@ -134,7 +133,6 @@ CANDIDATE RESUME TEXT:
             raw_data = parse_and_clean_json(content)
             return sanitize_resume_data(raw_data)
         except Exception:
-            # Fallback mock schema if Ollama service is unavailable
             fallback = dict(DEFAULT_RESUME_SCHEMA)
             fallback["Executive_Summary"] = "Unable to connect to Ollama AI service. Fallback preview mode active."
             fallback["Recruiter_Verdict"] = "Pending AI Service"
@@ -169,11 +167,6 @@ Return ONLY raw valid JSON conforming strictly to this format:
   ]
 }}
 
-CRITICAL RULES:
-- Do NOT include markdown code blocks.
-- Do NOT include any intro or commentary.
-- Match_Score must be an integer between 0 and 100 based on overlap of required skills, qualifications, and domain experience.
-
 CANDIDATE RESUME:
 {resume_text}
 
@@ -202,3 +195,89 @@ TARGET JOB DESCRIPTION:
             return sanitize_jd_match_data(raw_data)
         except Exception:
             return sanitize_jd_match_data(DEFAULT_JD_MATCH_SCHEMA)
+
+
+def rewrite_resume(resume_text: str) -> Dict[str, Any]:
+    """
+    Rewrites and transforms resume text into an optimized, ATS-friendly version with
+    quantified action-verb bullet points across Professional Summary, Skills, Experience,
+    Projects, Achievements, and Education.
+    """
+    if not resume_text or not resume_text.strip():
+        return sanitize_rewrite_data(DEFAULT_REWRITE_SCHEMA)
+
+    prompt = f"""
+You are a Master ATS Resume Writer, Professional Executive Editor, and Talent AI Coach.
+
+Transform and rewrite the candidate resume provided below into a high-impact, ATS-optimized resume.
+
+CRITICAL REWRITING RULES:
+1. Generate strong, action-verb-led bullet points for all experience and project entries (e.g. "Engineered...", "Optimized...", "Architected...").
+2. Include quantified metrics and ROI estimates where possible (e.g., "boosted throughput by 35%").
+3. Format Professional Summary, Skills, Experience, Projects, Key Achievements, and Education.
+
+Return ONLY raw valid JSON matching this exact structure:
+
+{{
+  "Professional_Summary": "Results-driven Senior Software Engineer with 5+ years of experience engineering high-throughput distributed microservices, cloud infrastructure, and AI systems. Proven track record of reducing latency by 40% and scaling systems to 1M+ active users.",
+  "Skills": ["Python", "Go", "Docker", "Kubernetes", "AWS", "SQL", "Microservices", "System Design"],
+  "Experience": [
+    {{
+      "Company": "Tech Solutions Inc.",
+      "Role": "Senior Backend Engineer",
+      "Duration": "2021 - Present",
+      "Bullet_Points": [
+        "Architected scalable microservices infrastructure handling 50M+ daily API calls using Go and Docker",
+        "Optimized database query performance by 45% using PostgreSQL index tuning and Redis caching",
+        "Mentored a cross-functional team of 6 junior engineers on CI/CD GitOps best practices"
+      ]
+    }}
+  ],
+  "Projects": [
+    {{
+      "Title": "Real-Time Analytics Pipeline",
+      "TechStack": "Python, Apache Kafka, PyTorch",
+      "Bullet_Points": [
+        "Designed real-time event streaming pipeline processing 10k events/sec with sub-50ms latency",
+        "Integrated AI sentiment classification model improving anomaly detection accuracy by 28%"
+      ]
+    }}
+  ],
+  "Achievements": [
+    "Awarded Top Innovator 2024 for reducing cloud infrastructure expenditures by $120k annually",
+    "Authored core internal Python framework adopted across 15 engineering squads"
+  ],
+  "Education": [
+    {{
+      "Degree": "B.S. in Computer Science",
+      "Institution": "University of Technology",
+      "Session": "2017 - 2021",
+      "Highlights": "Graduated Magna Cum Laude | Specialized in Distributed Systems & AI"
+    }}
+  ]
+}}
+
+CANDIDATE RESUME TEXT TO REWRITE:
+{resume_text}
+"""
+
+    try:
+        response = ollama.chat(
+            model=MODEL_NAME,
+            format="json",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        content = response.get("message", {}).get("content", "")
+        raw_data = parse_and_clean_json(content)
+        return sanitize_rewrite_data(raw_data)
+    except Exception as e:
+        try:
+            response = ollama.chat(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            content = response.get("message", {}).get("content", "")
+            raw_data = parse_and_clean_json(content)
+            return sanitize_rewrite_data(raw_data)
+        except Exception:
+            return sanitize_rewrite_data(DEFAULT_REWRITE_SCHEMA)

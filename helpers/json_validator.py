@@ -61,6 +61,15 @@ DEFAULT_JD_MATCH_SCHEMA: Dict[str, Any] = {
     "Suggestions": []
 }
 
+DEFAULT_REWRITE_SCHEMA: Dict[str, Any] = {
+    "Professional_Summary": "Professional summary optimized for ATS scanning.",
+    "Skills": [],
+    "Experience": [],
+    "Projects": [],
+    "Achievements": [],
+    "Education": []
+}
+
 def extract_json_string(text: str) -> str:
     """
     Extracts JSON content from raw LLM output text, eliminating markdown wrappers
@@ -69,12 +78,10 @@ def extract_json_string(text: str) -> str:
     if not text:
         return "{}"
     
-    # Try finding markdown ```json ... ``` code block
     match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL | re.IGNORECASE)
     if match:
         return match.group(1)
 
-    # Try finding outer braces {}
     match_braces = re.search(r"\{.*\}", text, re.DOTALL)
     if match_braces:
         return match_braces.group(0)
@@ -85,7 +92,6 @@ def repair_json_string(json_str: str) -> str:
     """
     Applies regex sanitization fixes for trailing commas or minor LLM JSON syntax bugs.
     """
-    # Remove trailing commas inside lists or objects e.g. [1, 2,] or {"a": 1,}
     json_str = re.sub(r",\s*([\]\}])", r"\1", json_str)
     return json_str
 
@@ -103,7 +109,6 @@ def parse_and_clean_json(raw_response: str) -> Dict[str, Any]:
     except json.JSONDecodeError:
         pass
 
-    # Secondary aggressive repair: try finding first '{' and last '}'
     try:
         start_idx = raw_response.find('{')
         end_idx = raw_response.rfind('}')
@@ -125,7 +130,6 @@ def sanitize_resume_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     sanitized = {}
 
-    # String fields
     string_fields = [
         "Name", "Email", "Phone",
         "Executive_Summary", "Resume_Overview", "Recruiter_Verdict",
@@ -138,7 +142,6 @@ def sanitize_resume_data(data: Dict[str, Any]) -> Dict[str, Any]:
         else:
             sanitized[field] = str(val).strip()
 
-    # List fields
     list_fields = [
         "Skills", "Technical_Strengths", "Soft_Skill_Strengths", "Strengths",
         "Weaknesses", "Missing_Skills", "Resume_Risks",
@@ -158,7 +161,6 @@ def sanitize_resume_data(data: Dict[str, Any]) -> Dict[str, Any]:
         else:
             sanitized[list_field] = [item for item in raw_list if item is not None]
 
-    # Cross-population for backward compatibility:
     if not sanitized["Technical_Strengths"] and sanitized["Strengths"]:
         sanitized["Technical_Strengths"] = list(sanitized["Strengths"])
     elif not sanitized["Strengths"] and sanitized["Technical_Strengths"]:
@@ -169,7 +171,6 @@ def sanitize_resume_data(data: Dict[str, Any]) -> Dict[str, Any]:
     elif not sanitized["Suggestions"] and sanitized["Career_Suggestions"]:
         sanitized["Suggestions"] = list(sanitized["Career_Suggestions"])
 
-    # Compute Weighted ATS Breakdown & Overall Score
     data_copy = dict(data)
     data_copy.update(sanitized)
     ats_breakdown = compute_weighted_ats_score(data_copy)
@@ -195,5 +196,24 @@ def sanitize_jd_match_data(data: Dict[str, Any]) -> Dict[str, Any]:
             sanitized[field] = [] if val is None else [str(val)]
         else:
             sanitized[field] = [str(item) for item in val if item is not None]
+
+    return sanitized
+
+def sanitize_rewrite_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Ensures AI rewrite response complies with DEFAULT_REWRITE_SCHEMA.
+    """
+    sanitized = {}
+    prof_sum = data.get("Professional_Summary")
+    sanitized["Professional_Summary"] = str(prof_sum).strip() if prof_sum else DEFAULT_REWRITE_SCHEMA["Professional_Summary"]
+
+    for list_field in ["Skills", "Experience", "Projects", "Achievements", "Education"]:
+        val = data.get(list_field)
+        if isinstance(val, list):
+            sanitized[list_field] = [item for item in val if item is not None]
+        elif val is not None:
+            sanitized[list_field] = [val]
+        else:
+            sanitized[list_field] = []
 
     return sanitized
