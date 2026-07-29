@@ -11,9 +11,11 @@ from helpers.json_validator import (
     sanitize_resume_data,
     sanitize_jd_match_data,
     sanitize_rewrite_data,
+    sanitize_interview_data,
     DEFAULT_RESUME_SCHEMA,
     DEFAULT_JD_MATCH_SCHEMA,
-    DEFAULT_REWRITE_SCHEMA
+    DEFAULT_REWRITE_SCHEMA,
+    DEFAULT_INTERVIEW_SCHEMA
 )
 
 
@@ -256,11 +258,117 @@ RAW USER SUBMITTED DRAFT DETAILS:
 """
 
 
+_INTERVIEW_PROMPT = """
+You are an expert Chief Technical Interviewer, Hiring Manager, and Interview Performance Simulation Engine.
+
+Based on the Candidate Resume and optional Target Job Description provided below, generate a comprehensive Interview Preparation package and simulate an Interview Readiness Score.
+
+Generate realistic questions with difficulty levels (Easy, Medium, Hard), high-impact AI model answers (using STAR methodology where applicable), and interviewer tips.
+
+Return ONLY raw valid JSON conforming strictly to this format:
+
+{{
+  "Interview_Score": 84,
+  "Score_Breakdown": {{
+    "Technical": 85,
+    "HR": 90,
+    "Behavioural": 80,
+    "Coding": 82,
+    "Project": 88
+  }},
+  "Score_Summary": "Candidate demonstrates strong technical fundamentals and project ownership, with slight room for improvement in STAR-framed behavioural responses.",
+  "Technical_Questions": [
+    {{
+      "Question": "Technical question specific to candidate skills/JD",
+      "Difficulty": "Easy",
+      "Answer": "Comprehensive model answer showing deep technical knowledge",
+      "Tips": "Key concepts to highlight during response"
+    }},
+    {{
+      "Question": "In-depth technical architecture question",
+      "Difficulty": "Medium",
+      "Answer": "Detailed model answer",
+      "Tips": "Focus on trade-offs and scalability"
+    }},
+    {{
+      "Question": "Advanced edge-case / performance tuning question",
+      "Difficulty": "Hard",
+      "Answer": "Expert-level model answer",
+      "Tips": "Quantify benchmarks and memory considerations"
+    }}
+  ],
+  "HR_Questions": [
+    {{
+      "Question": "Why do you want to join our organization?",
+      "Difficulty": "Easy",
+      "Answer": "Articulate alignment with company mission and technological stack",
+      "Tips": "Reference specific achievements and growth goals"
+    }},
+    {{
+      "Question": "Where do you see yourself in 3-5 years?",
+      "Difficulty": "Medium",
+      "Answer": "Balanced answer showing technical leadership aspirations",
+      "Tips": "Emphasize continuous learning and mentorship"
+    }}
+  ],
+  "Behavioural_Questions": [
+    {{
+      "Question": "Describe a scenario where you resolved a severe technical conflict with a team member.",
+      "Difficulty": "Medium",
+      "Answer": "STAR model response (Situation, Task, Action, Result) showcasing empathy and objective decision making",
+      "Tips": "Structure cleanly using Situation, Task, Action, Result"
+    }},
+    {{
+      "Question": "Tell me about a project failure and what you learned from it.",
+      "Difficulty": "Hard",
+      "Answer": "Honest STAR answer highlighting root cause analysis and post-mortem improvements",
+      "Tips": "Focus heavily on lessons learned and preventative steps implemented"
+    }}
+  ],
+  "Coding_Questions": [
+    {{
+      "Question": "How would you design and implement a thread-safe LRU cache with O(1) ops?",
+      "Difficulty": "Medium",
+      "Answer": "Optimal data structure choice (HashMap + Doubly Linked List) with concurrency locking",
+      "Tips": "Discuss time & space complexity clearly"
+    }},
+    {{
+      "Question": "Write an algorithm to detect cycles in a directed graph.",
+      "Difficulty": "Hard",
+      "Answer": "DFS state traversal (Unvisited, Visiting, Visited) or Kahn's algorithm algorithm outline",
+      "Tips": "State edge cases e.g. self-loops and disconnected components"
+    }}
+  ],
+  "Project_Questions": [
+    {{
+      "Question": "Walk me through the architecture of your top project mentioned on your resume.",
+      "Difficulty": "Medium",
+      "Answer": "High-level component breakdown, data flow, API layer, database design, and key bottleneck solutions",
+      "Tips": "Focus on your individual contributions and technical choices"
+    }},
+    {{
+      "Question": "How did you measure and ensure system performance in your key projects?",
+      "Difficulty": "Hard",
+      "Answer": "Metrics monitoring approach (latency percentiles, throughput, error rates) and load testing setup",
+      "Tips": "Provide concrete numbers and monitoring tool details"
+    }}
+  ]
+}}
+
+CANDIDATE RESUME:
+{resume_text}
+
+TARGET JOB DESCRIPTION:
+{job_description}
+"""
+
+
 # ─────────────────────────────────────────────────────────────
 #  PUBLIC API
 # ─────────────────────────────────────────────────────────────
 
 def analyze_resume(resume_text: str) -> Dict[str, Any]:
+
     """
     Analyzes extracted resume text using the active AI provider acting as an
     Intelligent ATS Recruiter. Returns weighted ATS sub-scores across 8 categories
@@ -355,3 +463,25 @@ def generate_builder_resume(user_inputs: Dict[str, Any]) -> Dict[str, Any]:
         if "Skills" in fallback and isinstance(fallback["Skills"], str):
             fallback["Skills"] = [s.strip() for s in fallback["Skills"].split(",") if s.strip()]
         return fallback
+
+
+def generate_interview_prep(resume_text: str, job_description: str = "") -> Dict[str, Any]:
+    """
+    Generates a tailored interview preparation package featuring Technical, HR,
+    Behavioural, Coding, and Project questions with difficulty levels (Easy, Medium, Hard),
+    AI model answers, interviewer tips, and an interview simulation score breakdown.
+    """
+    if not resume_text or not resume_text.strip():
+        return sanitize_interview_data(DEFAULT_INTERVIEW_SCHEMA)
+
+    prompt = _INTERVIEW_PROMPT.format(
+        resume_text=resume_text,
+        job_description=job_description if job_description.strip() else "General Software & Technical Role"
+    )
+
+    try:
+        content = _call_provider(prompt)
+        raw_data = parse_and_clean_json(content)
+        return sanitize_interview_data(raw_data)
+    except Exception:
+        return sanitize_interview_data(DEFAULT_INTERVIEW_SCHEMA)

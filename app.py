@@ -1,6 +1,6 @@
 import streamlit as st
 from utils import extract_text_from_pdf
-from ai_engine import analyze_resume, compare_resume_with_jd, rewrite_resume, generate_builder_resume
+from ai_engine import analyze_resume, compare_resume_with_jd, rewrite_resume, generate_builder_resume, generate_interview_prep
 from helpers.report_generator import generate_pdf_report
 from helpers.config_manager import load_config, get_current_provider_name, get_current_model
 from helpers.providers import PROVIDER_ICONS
@@ -19,6 +19,7 @@ from components.recruiter_view import render_recruiter_insights
 from components.rewriter_view import render_resume_rewriter_section
 from components.builder_view import render_resume_builder_section
 from components.settings_view import render_settings
+from components.interview_view import render_interview_prep_section
 
 # Load AI provider config from .env / session state on every cold start
 load_config()
@@ -206,11 +207,12 @@ else:
             # -----------------------------------------------------------------------------
             # 5. Main Application Tabs for Analyzer
             # -----------------------------------------------------------------------------
-            tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+            tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
                 "🤖 Recruiter AI Intelligence",
                 "✨ AI Resume Rewriter",
                 "📊 Executive Dashboard",
                 "🎯 JD Matcher Engine",
+                "🎯 Interview Prep",
                 "💼 Candidate Details",
                 "📥 Export & Raw Text"
             ])
@@ -235,8 +237,12 @@ else:
             with tab4:
                 render_jd_matching_section(resume_text, compare_resume_with_jd)
 
-            # TAB 5: PROFILE DETAILS (Education, Experience, Projects, Certifications)
+            # TAB 5: INTERVIEW PREPARATION & SIMULATION
             with tab5:
+                render_interview_prep_section(resume_text, generate_interview_prep)
+
+            # TAB 6: PROFILE DETAILS (Education, Experience, Projects, Certifications)
+            with tab6:
                 col_left, col_right = st.columns(2)
                 with col_left:
                     render_experience_section(ai_response.get("Experience", []))
@@ -245,8 +251,8 @@ else:
                     render_projects_section(ai_response.get("Projects", []))
                     render_certifications_section(ai_response.get("Certifications", []))
 
-            # TAB 6: REPORT DOWNLOAD & RAW TEXT VIEWER
-            with tab6:
+            # TAB 7: REPORT DOWNLOAD & RAW TEXT VIEWER
+            with tab7:
                 st.markdown('<div class="glass-card">', unsafe_allow_html=True)
                 st.subheader("📥 Export Executive Audit Report")
                 st.write("Download a comprehensive executive PDF report containing candidate metrics, Recruiter Verdict, weighted ATS breakdown, and development roadmap.")

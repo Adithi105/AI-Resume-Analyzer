@@ -217,3 +217,97 @@ def sanitize_rewrite_data(data: Dict[str, Any]) -> Dict[str, Any]:
             sanitized[list_field] = []
 
     return sanitized
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Interview Preparation Schema & Sanitizer
+# ─────────────────────────────────────────────────────────────────────────────
+
+_DEFAULT_QUESTION = {
+    "Question": "Not Available",
+    "Difficulty": "Medium",
+    "Answer": "No AI-generated answer available.",
+    "Tips": "",
+}
+
+DEFAULT_INTERVIEW_SCHEMA: Dict[str, Any] = {
+    "Interview_Score": 0,
+    "Score_Breakdown": {
+        "Technical": 0,
+        "HR": 0,
+        "Behavioural": 0,
+        "Coding": 0,
+        "Project": 0,
+    },
+    "Score_Summary": "Interview simulation score unavailable.",
+    "Technical_Questions": [],
+    "HR_Questions": [],
+    "Behavioural_Questions": [],
+    "Coding_Questions": [],
+    "Project_Questions": [],
+}
+
+_VALID_DIFFICULTIES = {"Easy", "Medium", "Hard"}
+_QUESTION_CATEGORIES = [
+    "Technical_Questions",
+    "HR_Questions",
+    "Behavioural_Questions",
+    "Coding_Questions",
+    "Project_Questions",
+]
+
+
+def _sanitize_question_list(raw: Any) -> list:
+    """Ensure a list of question dicts is well-formed."""
+    if not isinstance(raw, list):
+        return []
+    cleaned = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        q = {
+            "Question": str(item.get("Question", "")).strip() or _DEFAULT_QUESTION["Question"],
+            "Difficulty": item.get("Difficulty", "Medium"),
+            "Answer": str(item.get("Answer", "")).strip() or _DEFAULT_QUESTION["Answer"],
+            "Tips": str(item.get("Tips", "")).strip(),
+        }
+        if q["Difficulty"] not in _VALID_DIFFICULTIES:
+            q["Difficulty"] = "Medium"
+        cleaned.append(q)
+    return cleaned
+
+
+def sanitize_interview_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Validates and normalises interview preparation AI response.
+    Ensures all 5 question categories, difficulty tags, answers, score breakdown
+    and simulation score are present and correctly typed.
+    """
+    sanitized: Dict[str, Any] = {}
+
+    # Overall interview score
+    try:
+        score = int(data.get("Interview_Score", 0))
+        sanitized["Interview_Score"] = max(0, min(100, score))
+    except (ValueError, TypeError):
+        sanitized["Interview_Score"] = 0
+
+    # Per-category score breakdown
+    raw_breakdown = data.get("Score_Breakdown", {})
+    breakdown = {}
+    for cat in ["Technical", "HR", "Behavioural", "Coding", "Project"]:
+        try:
+            breakdown[cat] = max(0, min(100, int(raw_breakdown.get(cat, 0))))
+        except (ValueError, TypeError):
+            breakdown[cat] = 0
+    sanitized["Score_Breakdown"] = breakdown
+
+    # Score narrative
+    summary = data.get("Score_Summary", "")
+    sanitized["Score_Summary"] = str(summary).strip() if summary else DEFAULT_INTERVIEW_SCHEMA["Score_Summary"]
+
+    # Question categories
+    for cat_key in _QUESTION_CATEGORIES:
+        sanitized[cat_key] = _sanitize_question_list(data.get(cat_key, []))
+
+    return sanitized
