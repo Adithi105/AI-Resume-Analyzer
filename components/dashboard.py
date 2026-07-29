@@ -1,13 +1,14 @@
 import streamlit as st
 from typing import Dict, Any
+from components.ui_styles import render_badge
 
 def render_candidate_dashboard(data: Dict[str, Any]):
     """
-    Renders candidate executive overview metrics and ATS Score status card.
+    Renders candidate executive overview metrics, recruiter decision badges, and ATS Score status card.
     """
-    st.subheader("👤 Candidate Overview")
+    st.subheader("👤 Candidate Executive Overview")
     
-    # 4 Metric Cards
+    # 4 Primary Metric Cards
     col1, col2, col3, col4 = st.columns(4)
 
     name = data.get("Name", "Not Provided")
@@ -27,7 +28,26 @@ def render_candidate_dashboard(data: Dict[str, Any]):
     with col4:
         st.metric("⭐ Overall ATS Score", f"{ats_score} / 100")
 
+    # Recruiter Intelligence Summary Row
+    verdict = data.get("Recruiter_Verdict", "Under Review")
+    hiring_prob = data.get("Hiring_Probability", "0%")
+    level = data.get("Candidate_Level", "Not Specified")
+
     st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    st.markdown("### 🤖 Recruiter Intelligence Snapshot")
+    
+    r_col1, r_col2, r_col3 = st.columns(3)
+    with r_col1:
+        st.markdown(f"**Recruiter Verdict:** {render_badge(verdict, 'green' if 'hire' in verdict.lower() else 'blue')}", unsafe_allow_html=True)
+
+    with r_col2:
+        st.markdown(f"**Hiring Probability:** <span style='color: #38BDF8; font-weight: 800; font-size: 1.1rem;'>🎯 {hiring_prob}</span>", unsafe_allow_html=True)
+
+    with r_col3:
+        st.markdown(f"**Candidate Level:** {render_badge(level, 'blue', '👑')}", unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # ATS Score Status Badge & Progress Bar Container
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)

@@ -3,14 +3,37 @@ import re
 from typing import Dict, Any
 
 DEFAULT_RESUME_SCHEMA: Dict[str, Any] = {
-    "Name": "Not Provided",
-    "Email": "Not Provided",
-    "Phone": "Not Provided",
+    # Core Candidate Info
+    "Name": "Not Specified",
+    "Email": "Not Specified",
+    "Phone": "Not Specified",
     "ATS_Score": 0,
+    
+    # Recruiter Decision & Overview
+    "Executive_Summary": "Not Provided",
+    "Resume_Overview": "Not Provided",
+    "Recruiter_Verdict": "Under Review",
+    "Hiring_Probability": "0%",
+    "Candidate_Level": "Not Specified",
+    
+    # Strengths & Weaknesses Matrix
     "Skills": [],
-    "Missing_Skills": [],
+    "Technical_Strengths": [],
+    "Soft_Skill_Strengths": [],
     "Strengths": [],
+    "Weaknesses": [],
+    "Missing_Skills": [],
+    "Resume_Risks": [],
+    
+    # Growth & Recommendations
     "Suggestions": [],
+    "Career_Suggestions": [],
+    "Learning_Roadmap": [],
+    "Recommended_Certifications": [],
+    "Suggested_Projects": [],
+    "Resume_Rewrite_Suggestions": [],
+    
+    # Detailed Sections
     "Education": [],
     "Projects": [],
     "Certifications": [],
@@ -89,10 +112,15 @@ def sanitize_resume_data(data: Dict[str, Any]) -> Dict[str, Any]:
     sanitized = {}
 
     # String fields
-    for field in ["Name", "Email", "Phone"]:
+    string_fields = [
+        "Name", "Email", "Phone",
+        "Executive_Summary", "Resume_Overview", "Recruiter_Verdict",
+        "Hiring_Probability", "Candidate_Level"
+    ]
+    for field in string_fields:
         val = data.get(field)
         if not val or val is None or str(val).strip().lower() in ["none", "null", "n/a", ""]:
-            sanitized[field] = "Not Specified"
+            sanitized[field] = DEFAULT_RESUME_SCHEMA.get(field, "Not Specified")
         else:
             sanitized[field] = str(val).strip()
 
@@ -103,8 +131,14 @@ def sanitize_resume_data(data: Dict[str, Any]) -> Dict[str, Any]:
     except (ValueError, TypeError):
         sanitized["ATS_Score"] = 0
 
-    # List fields
-    list_fields = ["Skills", "Missing_Skills", "Strengths", "Suggestions", "Education", "Projects", "Certifications", "Experience"]
+    # List fields (simple string lists)
+    list_fields = [
+        "Skills", "Technical_Strengths", "Soft_Skill_Strengths", "Strengths",
+        "Weaknesses", "Missing_Skills", "Resume_Risks",
+        "Suggestions", "Career_Suggestions", "Learning_Roadmap",
+        "Recommended_Certifications", "Suggested_Projects", "Resume_Rewrite_Suggestions",
+        "Education", "Projects", "Certifications", "Experience"
+    ]
     for list_field in list_fields:
         raw_list = data.get(list_field)
         if not isinstance(raw_list, list):
@@ -115,8 +149,18 @@ def sanitize_resume_data(data: Dict[str, Any]) -> Dict[str, Any]:
             else:
                 sanitized[list_field] = []
         else:
-            # Filter out None values in list
             sanitized[list_field] = [item for item in raw_list if item is not None]
+
+    # Cross-population for backward compatibility:
+    if not sanitized["Technical_Strengths"] and sanitized["Strengths"]:
+        sanitized["Technical_Strengths"] = list(sanitized["Strengths"])
+    elif not sanitized["Strengths"] and sanitized["Technical_Strengths"]:
+        sanitized["Strengths"] = list(sanitized["Technical_Strengths"])
+
+    if not sanitized["Career_Suggestions"] and sanitized["Suggestions"]:
+        sanitized["Career_Suggestions"] = list(sanitized["Suggestions"])
+    elif not sanitized["Suggestions"] and sanitized["Career_Suggestions"]:
+        sanitized["Suggestions"] = list(sanitized["Career_Suggestions"])
 
     return sanitized
 

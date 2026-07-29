@@ -12,33 +12,53 @@ MODEL_NAME = "llama3.2:3b"
 
 def analyze_resume(resume_text: str) -> Dict[str, Any]:
     """
-    Analyzes extracted resume text using Ollama (Llama 3.2 3B) and evaluates
-    candidate metrics, skills, missing skills, ATS score, experience, education,
-    and projects into strict structured JSON.
+    Analyzes extracted resume text using Ollama (Llama 3.2 3B) acting as an Intelligent
+    ATS Recruiter and Executive Talent Specialist. Returns 16 rich recruiter intelligence
+    metrics in structured JSON.
     """
     if not resume_text or not resume_text.strip():
         return sanitize_resume_data({"error": "Empty resume text."})
 
     prompt = f"""
-You are an expert ATS (Applicant Tracking System) Resume Auditor and Talent AI Specialist.
+You are an expert Executive Talent Acquisition Partner, Chief Technical Recruiter, and Applicant Tracking System (ATS) Auditor.
 
-Analyze the resume provided below and return ONLY a valid raw JSON object.
+Analyze the candidate resume provided below and act as an Intelligent ATS Recruiter.
 
-CRITICAL CONSTRAINTS:
-1. Return strictly a raw JSON object.
-2. Do NOT use markdown code blocks like ```json or ```.
-3. Do NOT include any intro, commentary, explanations, or conclusions.
-4. Output MUST conform to this exact JSON schema:
+Return ONLY a valid raw JSON object matching this exact structure:
 
 {{
-  "Name": "Candidate Name",
+  "Name": "Candidate Full Name",
   "Email": "Email Address",
   "Phone": "Phone Number",
+  "Executive_Summary": "High-impact 2-3 sentence executive summary of the candidate's caliber, domain background, and overall positioning.",
+  "Resume_Overview": "Concise 2-sentence summary of candidate professional background, years of experience, and key domain expertise.",
   "ATS_Score": 85,
-  "Skills": ["Skill1", "Skill2"],
-  "Missing_Skills": ["MissingSkill1"],
-  "Strengths": ["Strength1", "Strength2"],
-  "Suggestions": ["Suggestion1", "Suggestion2"],
+  "Recruiter_Verdict": "Strong Hire",
+  "Hiring_Probability": "88%",
+  "Candidate_Level": "Senior Technical Specialist",
+  "Technical_Strengths": ["Core technical skill 1", "Core technical skill 2"],
+  "Soft_Skill_Strengths": ["Leadership", "Stakeholder Communication"],
+  "Weaknesses": ["Identified weakness or gap 1", "Identified weakness 2"],
+  "Missing_Skills": ["Missing skill 1", "Missing skill 2"],
+  "Resume_Risks": ["Risk or red flag 1 e.g. lack of quantitative metrics", "Risk 2 e.g. employment gap"],
+  "Career_Suggestions": ["Actionable career advice 1", "Actionable advice 2"],
+  "Learning_Roadmap": [
+    "Phase 1: Master advanced cloud architecture & Kubernetes",
+    "Phase 2: Obtain AWS Solutions Architect Professional certification",
+    "Phase 3: Lead large-scale microservices system design"
+  ],
+  "Recommended_Certifications": ["AWS Certified Solutions Architect", "CKA - Certified Kubernetes Administrator"],
+  "Suggested_Projects": [
+    "Build a distributed event-driven real-time streaming pipeline using Kafka and Go",
+    "Implement an automated CI/CD pipeline with GitOps and ArgoCD"
+  ],
+  "Resume_Rewrite_Suggestions": [
+    "Rewrite Work Experience bullet 1 to include quantified ROI (e.g. 'Improved throughput by 40%')",
+    "Add a dedicated Core Competencies section near the top of page 1"
+  ],
+  "Skills": ["Python", "Docker", "SQL", "React"],
+  "Strengths": ["System Architecture", "Performance Optimization"],
+  "Suggestions": ["Quantify achievements in project descriptions"],
   "Education": [
     {{
       "Degree": "Degree Name",
@@ -70,14 +90,14 @@ CRITICAL CONSTRAINTS:
   ]
 }}
 
-ATS SCORE CALCULATOR RULES:
-- Calculate ATS_Score (0-100) rigorously based on:
-  * Section clarity & formatting
-  * Technical skills & key industry keywords
-  * Quantitative project & work experience achievements
-  * Education credentials
+CRITICAL INSTRUCTIONS:
+1. Return strictly raw valid JSON. Do NOT use markdown ```json wrappers or introductory text.
+2. ATS_Score must be an integer between 0 and 100 calculated rigorously.
+3. Recruiter_Verdict must be one of: "Strong Hire", "Shortlist / Interview", "Borderline Candidate", or "Reject / Re-align".
+4. Hiring_Probability must be a percentage string (e.g., "85%").
+5. Candidate_Level must evaluate candidate seniority (e.g., "Junior", "Mid-Level", "Senior", "Lead / Principal").
 
-RESUME TEXT:
+CANDIDATE RESUME TEXT:
 {resume_text}
 """
 
@@ -85,12 +105,7 @@ RESUME TEXT:
         response = ollama.chat(
             model=MODEL_NAME,
             format="json",
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
+            messages=[{"role": "user", "content": prompt}]
         )
 
         content = response.get("message", {}).get("content", "")
@@ -111,6 +126,8 @@ RESUME TEXT:
         except Exception:
             # Fallback mock schema if Ollama service is unavailable
             fallback = dict(DEFAULT_RESUME_SCHEMA)
+            fallback["Executive_Summary"] = "Unable to connect to Ollama AI service. Fallback preview mode active."
+            fallback["Recruiter_Verdict"] = "Pending AI Service"
             fallback["Suggestions"] = [
                 f"Ollama connection error ({str(e)}). Please ensure Ollama service is running (`ollama run llama3.2:3b`)."
             ]
