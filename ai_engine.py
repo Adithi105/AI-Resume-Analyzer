@@ -13,11 +13,13 @@ from helpers.json_validator import (
     sanitize_rewrite_data,
     sanitize_interview_data,
     sanitize_portfolio_data,
+    sanitize_career_coach_data,
     DEFAULT_RESUME_SCHEMA,
     DEFAULT_JD_MATCH_SCHEMA,
     DEFAULT_REWRITE_SCHEMA,
     DEFAULT_INTERVIEW_SCHEMA,
-    DEFAULT_PORTFOLIO_SCHEMA
+    DEFAULT_PORTFOLIO_SCHEMA,
+    DEFAULT_CAREER_COACH_SCHEMA
 )
 
 
@@ -551,27 +553,205 @@ def generate_interview_prep(resume_text: str, job_description: str = "") -> Dict
         return sanitize_interview_data(DEFAULT_INTERVIEW_SCHEMA)
 
 
-def analyze_portfolio(
-    github_url: str = "",
-    linkedin_url: str = "",
-    portfolio_url: str = "",
-    candidate_notes: str = ""
+_CAREER_COACH_PROMPT = """
+You are a Senior Principal Career Architect, Executive Talent Coach, and Tech Compensation Strategist.
+
+Based on the Candidate Resume, Target Role, and Target Experience Level provided below, construct an end-to-end AI Career Coaching Dashboard plan.
+
+Generate ALL 11 required elements:
+1. Career Roadmap (3 phases with milestones)
+2. Learning Path (core technical topics)
+3. Weekly Study Plan (Week 1 through 4 with deliverables & hours)
+4. Monthly Goals (Month 1, 2, 3 milestones)
+5. Recommended Courses (course name, platform, skill target)
+6. Recommended Certifications (certification title, provider, difficulty)
+7. Salary Estimation (Entry, Mid, Senior level ranges, currency, market outlook)
+8. Suitable Job Roles (role titles with match percentage)
+9. Internship Suggestions (track, company types, focus)
+10. Company Recommendations (target company names, company type, why fit)
+11. Skill Gap Analysis (current mastery skills vs gaps to close & critical focus area)
+
+Return ONLY raw valid JSON conforming strictly to this format:
+
+{{
+  "Target_Role": "{target_role}",
+  "Current_Level": "{experience_level}",
+  "Salary_Estimation": {{
+    "Entry_Level": "$80,000 - $105,000",
+    "Mid_Level": "$120,000 - $155,000",
+    "Senior_Level": "$165,000 - $225,000",
+    "Market_Outlook": "Very High Demand (+24% Growth)",
+    "Currency": "USD"
+  }},
+  "Suitable_Job_Roles": [
+    {{"Role": "Senior Backend Systems Engineer", "Match_Percentage": 90}},
+    {{"Role": "Cloud Solutions Architect", "Match_Percentage": 84}},
+    {{"Role": "Platform / Infrastructure Specialist", "Match_Percentage": 78}}
+  ],
+  "Skill_Gap_Analysis": {{
+    "Current_Mastery": ["Python", "Docker", "SQL", "REST APIs"],
+    "Gaps_To_Close": ["Kubernetes Orchestration", "AWS Distributed Systems", "System Design at Scale", "Terraform IaC"],
+    "Critical_Focus_Area": "Mastering container orchestration (Kubernetes) and cloud system design trade-offs"
+  }},
+  "Career_Roadmap": [
+    {{
+      "Phase": "Phase 1: Foundations & Cloud Setup (Months 1-2)",
+      "Focus": "Deepen cloud infrastructure & container networking",
+      "Milestones": [
+        "Obtain AWS Solutions Architect Associate certification",
+        "Deploy a microservices application using Terraform on AWS"
+      ]
+    }},
+    {{
+      "Phase": "Phase 2: Orchestration & Distributed Systems (Months 3-4)",
+      "Focus": "Master Kubernetes, gRPC, and event-driven streaming",
+      "Milestones": [
+        "Achieve CKA (Certified Kubernetes Administrator)",
+        "Build an event-driven telemetry pipeline using Apache Kafka"
+      ]
+    }},
+    {{
+      "Phase": "Phase 3: System Design & Executive Branding (Months 5-6)",
+      "Focus": "Senior technical interview prep and open-source leadership",
+      "Milestones": [
+        "Complete 20 System Design mock interviews",
+        "Publish 2 technical deep-dive articles & launch updated portfolio"
+      ]
+    }}
+  ],
+  "Learning_Path": [
+    "Distributed Systems Engineering (Raft/Paxos, Eventual Consistency)",
+    "Cloud Native Infrastructure (Kubernetes, Helm, Service Mesh)",
+    "High-Throughput Storage & Caching (Redis, DynamoDB, PostgreSQL Tuning)",
+    "System Design & Scalability Patterns (Load Balancing, Rate Limiting, Sharding)"
+  ],
+  "Weekly_Study_Plan": [
+    {{
+      "Week": "Week 1",
+      "Topic": "Advanced Async Python & Microservices Design",
+      "Hours": 12,
+      "Deliverable": "Build high-throughput AsyncIO service with Redis cache"
+    }},
+    {{
+      "Week": "Week 2",
+      "Topic": "Docker Security & Multi-Cluster Networking",
+      "Hours": 14,
+      "Deliverable": "Deploy hardened multi-container architecture"
+    }},
+    {{
+      "Week": "Week 3",
+      "Topic": "Kubernetes Architecture, Ingress & Helm Charts",
+      "Hours": 15,
+      "Deliverable": "Deploy production Helm chart to local Kubernetes cluster"
+    }},
+    {{
+      "Week": "Week 4",
+      "Topic": "System Design Patterns: Rate Limiters & Distributed Caches",
+      "Hours": 12,
+      "Deliverable": "Write detailed architecture spec & perform mock interview"
+    }}
+  ],
+  "Monthly_Goals": [
+    {{
+      "Month": "Month 1",
+      "Goal": "Complete Cloud Architecture training & publish 1 open-source repository with full CI/CD"
+    }},
+    {{
+      "Month": "Month 2",
+      "Goal": "Pass Certified Kubernetes Administrator (CKA) exam"
+    }},
+    {{
+      "Month": "Month 3",
+      "Goal": "Finish 15 System Design mocks and submit applications for top target companies"
+    }}
+  ],
+  "Recommended_Courses": [
+    {{
+      "Course": "AWS Certified Solutions Architect Professional",
+      "Platform": "Udemy / A Cloud Guru",
+      "Skill_Target": "Cloud Architecture"
+    }},
+    {{
+      "Course": "Certified Kubernetes Administrator (CKA) with Practice Tests",
+      "Platform": "KodeKloud / Linux Foundation",
+      "Skill_Target": "Container Orchestration"
+    }},
+    {{
+      "Course": "Grokking Modern System Design for Engineers",
+      "Platform": "Educative.io",
+      "Skill_Target": "System Design"
+    }}
+  ],
+  "Recommended_Certifications": [
+    {{
+      "Certification": "AWS Certified Solutions Architect",
+      "Provider": "Amazon Web Services",
+      "Difficulty": "Intermediate"
+    }},
+    {{
+      "Certification": "CKA - Certified Kubernetes Administrator",
+      "Provider": "Linux Foundation",
+      "Difficulty": "Hard"
+    }}
+  ],
+  "Internship_Suggestions": [
+    {{
+      "Track": "Cloud Infrastructure & Platform Engineer Fellow",
+      "Company_Types": "High-Growth Tech Startups / Scaleups",
+      "Key_Focus": "Infrastructure as Code & Kubernetes"
+    }},
+    {{
+      "Track": "Backend & Systems Distributed Engineering Intern",
+      "Company_Types": "Enterprise Cloud SaaS Companies",
+      "Key_Focus": "API performance optimization & database tuning"
+    }}
+  ],
+  "Company_Recommendations": [
+    {{
+      "Company": "Datadog",
+      "Type": "Observability Leader",
+      "Why_Fit": "Strong match for cloud infrastructure and systems telemetry"
+    }},
+    {{
+      "Company": "Cloudflare",
+      "Type": "Edge Cloud Unicorn",
+      "Why_Fit": "Excellent environment for high-performance edge engineering"
+    }},
+    {{
+      "Company": "Stripe",
+      "Type": "Fintech Infrastructure",
+      "Why_Fit": "Ideal for high-reliability microservices and distributed API design"
+    }}
+  ]
+}}
+
+CANDIDATE CONTEXT & RESUME:
+{resume_text}
+
+TARGET ROLE: {target_role}
+TARGET LEVEL: {experience_level}
+"""
+
+
+def generate_career_coaching(
+    resume_text: str = "",
+    target_role: str = "Software Engineer",
+    experience_level: str = "Mid Level"
 ) -> Dict[str, Any]:
     """
-    Analyzes candidate's GitHub Profile, LinkedIn Profile, and Portfolio Website to
-    generate comprehensive presence scores, repository quality, project quality,
-    contribution analysis, improvement suggestions, and technology recommendations.
+    Generates an executive AI Career Coaching Dashboard featuring Roadmap, Learning Path,
+    Weekly Study Plan, Monthly Goals, Courses, Certifications, Salary Estimation, Suitable Roles,
+    Internship Suggestions, Company Recommendations, and Skill Gap Analysis.
     """
-    prompt = _PORTFOLIO_PROMPT.format(
-        github_url=github_url if github_url.strip() else "Not Provided (Evaluate based on notes)",
-        linkedin_url=linkedin_url if linkedin_url.strip() else "Not Provided",
-        portfolio_url=portfolio_url if portfolio_url.strip() else "Not Provided",
-        candidate_notes=candidate_notes if candidate_notes.strip() else "No extra notes provided."
+    prompt = _CAREER_COACH_PROMPT.format(
+        resume_text=resume_text if resume_text.strip() else "Experienced Software & Technical Professional",
+        target_role=target_role if target_role.strip() else "Software Engineer",
+        experience_level=experience_level if experience_level.strip() else "Mid Level"
     )
 
     try:
         content = _call_provider(prompt)
         raw_data = parse_and_clean_json(content)
-        return sanitize_portfolio_data(raw_data)
+        return sanitize_career_coach_data(raw_data)
     except Exception:
-        return sanitize_portfolio_data(DEFAULT_PORTFOLIO_SCHEMA)
+        return sanitize_career_coach_data(DEFAULT_CAREER_COACH_SCHEMA)

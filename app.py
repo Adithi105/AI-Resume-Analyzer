@@ -6,7 +6,8 @@ from ai_engine import (
     rewrite_resume,
     generate_builder_resume,
     generate_interview_prep,
-    analyze_portfolio
+    analyze_portfolio,
+    generate_career_coaching
 )
 from helpers.report_generator import generate_pdf_report
 from helpers.config_manager import load_config, get_current_provider_name, get_current_model
@@ -28,6 +29,7 @@ from components.builder_view import render_resume_builder_section
 from components.settings_view import render_settings
 from components.interview_view import render_interview_prep_section
 from components.portfolio_view import render_portfolio_analyzer_section
+from components.career_coach_view import render_career_coach_section
 
 # Load AI provider config from .env / session state on every cold start
 load_config()
@@ -58,9 +60,9 @@ with st.sidebar:
     # Primary Application Suite Mode Switcher
     suite_mode = st.radio(
         "🚀 Select Application Suite",
-        ["🔍 AI Resume Analyzer", "📝 AI Resume Builder", "🌐 Portfolio Analyzer", "⚙️ AI Settings"],
+        ["🔍 AI Resume Analyzer", "📝 AI Resume Builder", "🌐 Portfolio Analyzer", "🧭 AI Career Coach", "⚙️ AI Settings"],
         index=0,
-        help="Switch between analyzing a resume, building a new one, auditing your online portfolio, or configuring your AI provider."
+        help="Switch between analyzing a resume, building a new one, auditing your online portfolio, coaching your career, or configuring your AI provider."
     )
 
     # Active provider badge in sidebar
@@ -141,6 +143,16 @@ with st.sidebar:
         4. **Inspect** Portfolio UI  
         5. **Review** Recommendations  
         """)
+    elif "Coach" in suite_mode:
+        uploaded_file = None
+        st.markdown("""
+        #### 🧭 Coach Workflow
+        1. **Set** Target Role  
+        2. **Generate** Career Plan  
+        3. **Review** Salary & Roles  
+        4. **Follow** Roadmap  
+        5. **Execute** Weekly Plan  
+        """)
     else:
         # Settings mode
         uploaded_file = None
@@ -164,8 +176,8 @@ _active_provider_label = f"{PROVIDER_ICONS.get(get_current_provider_name(), '�
 st.markdown(f"""
 <div class="app-header-container">
     <div>
-        <h1 class="app-header-title">📄 Enterprise AI Resume Analyzer, Builder & Portfolio Suite</h1>
-        <p class="app-header-subtitle">Deep neural ATS recruitment audit, 8-category weighted scoring, AI resume rewriting, multi-template builder, and online portfolio quality analysis.</p>
+        <h1 class="app-header-title">📄 Enterprise AI Resume Analyzer, Builder & Career Suite</h1>
+        <p class="app-header-subtitle">Deep neural ATS recruitment audit, 8-category weighted scoring, AI resume rewriting, multi-template builder, and AI career coaching.</p>
     </div>
     <div>
         <span class="enterprise-badge">● {suite_mode}</span>
@@ -184,13 +196,20 @@ if "Settings" in suite_mode:
     render_settings()
 
 # =============================================================================
-# SUITE B: PORTFOLIO ANALYZER
+# SUITE B: AI CAREER COACH
+# =============================================================================
+elif "Coach" in suite_mode:
+    resume_text_context = st.session_state.get("resume_text", "")
+    render_career_coach_section(resume_text_context, generate_career_coaching)
+
+# =============================================================================
+# SUITE C: PORTFOLIO ANALYZER
 # =============================================================================
 elif "Portfolio" in suite_mode:
     render_portfolio_analyzer_section(analyze_portfolio)
 
 # =============================================================================
-# SUITE C: AI RESUME BUILDER
+# SUITE D: AI RESUME BUILDER
 # =============================================================================
 elif "Builder" in suite_mode:
     render_resume_builder_section(generate_builder_resume)

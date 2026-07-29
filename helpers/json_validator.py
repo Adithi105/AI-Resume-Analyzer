@@ -404,17 +404,222 @@ def sanitize_portfolio_data(data: Dict[str, Any]) -> Dict[str, Any]:
         "Areas_For_Improvement": [str(x) for x in pw.get("Areas_For_Improvement", []) if x] or DEFAULT_PORTFOLIO_SCHEMA["Portfolio_Website_Analysis"]["Areas_For_Improvement"],
     }
 
-    # Main text & list fields
-    ca = data.get("Contribution_Analysis")
-    sanitized["Contribution_Analysis"] = str(ca).strip() if ca else DEFAULT_PORTFOLIO_SCHEMA["Contribution_Analysis"]
+# ─────────────────────────────────────────────────────────────────────────────
+# AI Career Coach Schema & Sanitizer
+# ─────────────────────────────────────────────────────────────────────────────
 
-    for list_field in ["Improvement_Suggestions", "Technology_Recommendations"]:
-        raw_list = data.get(list_field)
-        if isinstance(raw_list, list):
-            sanitized[list_field] = [str(x).strip() for x in raw_list if x]
-        elif raw_list:
-            sanitized[list_field] = [str(raw_list).strip()]
-        else:
-            sanitized[list_field] = list(DEFAULT_PORTFOLIO_SCHEMA[list_field])
+DEFAULT_CAREER_COACH_SCHEMA: Dict[str, Any] = {
+    "Target_Role": "Software Engineer",
+    "Current_Level": "Mid Level",
+    "Salary_Estimation": {
+        "Entry_Level": "$70,000 - $95,000",
+        "Mid_Level": "$105,000 - $140,000",
+        "Senior_Level": "$150,000 - $210,000",
+        "Market_Outlook": "Very High Demand (+22% Growth rate)",
+        "Currency": "USD"
+    },
+    "Suitable_Job_Roles": [
+        {"Role": "Backend Systems Engineer", "Match_Percentage": 92},
+        {"Role": "Cloud Solutions Architect", "Match_Percentage": 85},
+        {"Role": "DevOps / Infrastructure Engineer", "Match_Percentage": 78}
+    ],
+    "Skill_Gap_Analysis": {
+        "Current_Mastery": ["Python", "SQL", "REST APIs", "Docker"],
+        "Gaps_To_Close": ["Kubernetes", "AWS Architecture", "Distributed Caching", "System Design"],
+        "Critical_Focus_Area": "Cloud-native distributed systems design and container orchestration"
+    },
+    "Career_Roadmap": [
+        {"Phase": "Phase 1 (Months 1-2)", "Focus": "Core Infrastructure & Cloud Basics", "Milestones": ["Master Docker & AWS Core", "Build 1 Cloud Microservice"]},
+        {"Phase": "Phase 2 (Months 3-4)", "Focus": "Orchestration & System Scaling", "Milestones": ["CKA Certification Prep", "Implement Kafka Event Pipeline"]},
+        {"Phase": "Phase 3 (Months 5-6)", "Focus": "Senior Positioning & Leadership", "Milestones": ["Lead Architecture Review", "Interview Prep & Portfolio Launch"]}
+    ],
+    "Learning_Path": [
+        "Distributed Systems Foundations (Consensus algorithms, CAP theorem)",
+        "Advanced Cloud Architecture on AWS/GCP",
+        "Container Orchestration with Kubernetes & Helm",
+        "Production Monitoring & Observability (Prometheus & Grafana)"
+    ],
+    "Weekly_Study_Plan": [
+        {"Week": "Week 1", "Topic": "Advanced Python Concurrency & AsyncIO", "Hours": 10, "Deliverable": "Build async web crawler with Redis cache"},
+        {"Week": "Week 2", "Topic": "Docker Networking & Multi-stage Builds", "Hours": 12, "Deliverable": "Containerize full stack application"},
+        {"Week": "Week 3", "Topic": "Kubernetes Pods, Services & Deployments", "Hours": 15, "Deliverable": "Deploy K8s cluster on Minikube"},
+        {"Week": "Week 4", "Topic": "System Design Mock Interviews & API Design", "Hours": 12, "Deliverable": "Design URL Shortener architecture"}
+    ],
+    "Monthly_Goals": [
+        {"Month": "Month 1", "Goal": "Complete AWS Developer Associate course & deploy 2 microservices"},
+        {"Month": "Month 2", "Goal": "Achieve Kubernetes CKA certification & contribute to 1 open-source repo"},
+        {"Month": "Month 3", "Goal": "Polish portfolio, complete 15 System Design mocks, apply for target roles"}
+    ],
+    "Recommended_Courses": [
+        {"Course": "Ultimate AWS Certified Solutions Architect Associate", "Platform": "Udemy / Coursera", "Skill_Target": "Cloud Infrastructure"},
+        {"Course": "Certified Kubernetes Administrator (CKA) Mastery", "Platform": "Linux Foundation", "Skill_Target": "Container Orchestration"},
+        {"Course": "Grokking the System Design Interview", "Platform": "DesignGurus / Educative", "Skill_Target": "System Architecture"}
+    ],
+    "Recommended_Certifications": [
+        {"Certification": "AWS Certified Solutions Architect", "Provider": "Amazon Web Services", "Difficulty": "Intermediate"},
+        {"Certification": "CKA - Certified Kubernetes Administrator", "Provider": "Linux Foundation", "Difficulty": "Hard"}
+    ],
+    "Internship_Suggestions": [
+        {"Track": "Cloud Infrastructure Intern / Apprentice", "Company_Types": "Tech Unicorns / Cloud Native Startups", "Key_Focus": "Hands-on CI/CD & Terraform"},
+        {"Track": "Backend Engineering Fellow", "Company_Types": "Enterprise SaaS", "Key_Focus": "High-throughput API development"}
+    ],
+    "Company_Recommendations": [
+        {"Company": "Datadog", "Type": "Growth Unicorn", "Why_Fit": "Strong match for observability & infrastructure focus"},
+        {"Company": "AWS / Amazon", "Type": "Big Tech / Enterprise", "Why_Fit": "Ideal environment for cloud scale engineering"},
+        {"Company": "HashiCorp", "Type": "DevOps & Cloud Specialist", "Why_Fit": "Direct alignment with open-source infrastructure tools"}
+    ]
+}
+
+
+def sanitize_career_coach_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Validates and normalizes AI Career Coach response.
+    Ensures all 11 required sections conform strictly to expected structures.
+    """
+    sanitized: Dict[str, Any] = {}
+
+    sanitized["Target_Role"] = str(data.get("Target_Role", "Software Engineer")).strip()
+    sanitized["Current_Level"] = str(data.get("Current_Level", "Mid Level")).strip()
+
+    # Salary Estimation
+    sal = data.get("Salary_Estimation", {})
+    sanitized["Salary_Estimation"] = {
+        "Entry_Level": str(sal.get("Entry_Level", DEFAULT_CAREER_COACH_SCHEMA["Salary_Estimation"]["Entry_Level"])).strip(),
+        "Mid_Level": str(sal.get("Mid_Level", DEFAULT_CAREER_COACH_SCHEMA["Salary_Estimation"]["Mid_Level"])).strip(),
+        "Senior_Level": str(sal.get("Senior_Level", DEFAULT_CAREER_COACH_SCHEMA["Salary_Estimation"]["Senior_Level"])).strip(),
+        "Market_Outlook": str(sal.get("Market_Outlook", DEFAULT_CAREER_COACH_SCHEMA["Salary_Estimation"]["Market_Outlook"])).strip(),
+        "Currency": str(sal.get("Currency", "USD")).strip(),
+    }
+
+    # Suitable Job Roles
+    roles = data.get("Suitable_Job_Roles", [])
+    sanitized_roles = []
+    if isinstance(roles, list):
+        for r in roles:
+            if isinstance(r, dict):
+                try:
+                    pct = max(0, min(100, int(r.get("Match_Percentage", 80))))
+                except (ValueError, TypeError):
+                    pct = 80
+                sanitized_roles.append({
+                    "Role": str(r.get("Role", "Software Role")).strip(),
+                    "Match_Percentage": pct
+                })
+    sanitized["Suitable_Job_Roles"] = sanitized_roles or DEFAULT_CAREER_COACH_SCHEMA["Suitable_Job_Roles"]
+
+    # Skill Gap Analysis
+    sg = data.get("Skill_Gap_Analysis", {})
+    sanitized["Skill_Gap_Analysis"] = {
+        "Current_Mastery": [str(x) for x in sg.get("Current_Mastery", []) if x] or DEFAULT_CAREER_COACH_SCHEMA["Skill_Gap_Analysis"]["Current_Mastery"],
+        "Gaps_To_Close": [str(x) for x in sg.get("Gaps_To_Close", []) if x] or DEFAULT_CAREER_COACH_SCHEMA["Skill_Gap_Analysis"]["Gaps_To_Close"],
+        "Critical_Focus_Area": str(sg.get("Critical_Focus_Area", DEFAULT_CAREER_COACH_SCHEMA["Skill_Gap_Analysis"]["Critical_Focus_Area"])).strip(),
+    }
+
+    # Career Roadmap
+    roadmap = data.get("Career_Roadmap", [])
+    sanitized_rm = []
+    if isinstance(roadmap, list):
+        for item in roadmap:
+            if isinstance(item, dict):
+                m_list = item.get("Milestones", [])
+                if isinstance(m_list, list):
+                    m_clean = [str(x) for x in m_list if x]
+                else:
+                    m_clean = [str(m_list)]
+                sanitized_rm.append({
+                    "Phase": str(item.get("Phase", "Phase 1")).strip(),
+                    "Focus": str(item.get("Focus", "Core Skill Building")).strip(),
+                    "Milestones": m_clean
+                })
+    sanitized["Career_Roadmap"] = sanitized_rm or DEFAULT_CAREER_COACH_SCHEMA["Career_Roadmap"]
+
+    # Learning Path
+    lp = data.get("Learning_Path", [])
+    if isinstance(lp, list):
+        sanitized["Learning_Path"] = [str(x) for x in lp if x]
+    else:
+        sanitized["Learning_Path"] = list(DEFAULT_CAREER_COACH_SCHEMA["Learning_Path"])
+
+    # Weekly Study Plan
+    wsp = data.get("Weekly_Study_Plan", [])
+    sanitized_wsp = []
+    if isinstance(wsp, list):
+        for item in wsp:
+            if isinstance(item, dict):
+                try:
+                    hrs = int(item.get("Hours", 10))
+                except (ValueError, TypeError):
+                    hrs = 10
+                sanitized_wsp.append({
+                    "Week": str(item.get("Week", "Week 1")).strip(),
+                    "Topic": str(item.get("Topic", "Core Learning")).strip(),
+                    "Hours": hrs,
+                    "Deliverable": str(item.get("Deliverable", "Practical Exercise")).strip()
+                })
+    sanitized["Weekly_Study_Plan"] = sanitized_wsp or DEFAULT_CAREER_COACH_SCHEMA["Weekly_Study_Plan"]
+
+    # Monthly Goals
+    mg = data.get("Monthly_Goals", [])
+    sanitized_mg = []
+    if isinstance(mg, list):
+        for item in mg:
+            if isinstance(item, dict):
+                sanitized_mg.append({
+                    "Month": str(item.get("Month", "Month 1")).strip(),
+                    "Goal": str(item.get("Goal", "Complete Core Milestone")).strip()
+                })
+    sanitized["Monthly_Goals"] = sanitized_mg or DEFAULT_CAREER_COACH_SCHEMA["Monthly_Goals"]
+
+    # Recommended Courses
+    courses = data.get("Recommended_Courses", [])
+    sanitized_c = []
+    if isinstance(courses, list):
+        for item in courses:
+            if isinstance(item, dict):
+                sanitized_c.append({
+                    "Course": str(item.get("Course", "Professional Certification Course")).strip(),
+                    "Platform": str(item.get("Platform", "Online Learning")).strip(),
+                    "Skill_Target": str(item.get("Skill_Target", "Core Competency")).strip()
+                })
+    sanitized["Recommended_Courses"] = sanitized_c or DEFAULT_CAREER_COACH_SCHEMA["Recommended_Courses"]
+
+    # Recommended Certifications
+    certs = data.get("Recommended_Certifications", [])
+    sanitized_certs = []
+    if isinstance(certs, list):
+        for item in certs:
+            if isinstance(item, dict):
+                sanitized_certs.append({
+                    "Certification": str(item.get("Certification", "Industry Certification")).strip(),
+                    "Provider": str(item.get("Provider", "Vendor")).strip(),
+                    "Difficulty": str(item.get("Difficulty", "Intermediate")).strip()
+                })
+    sanitized["Recommended_Certifications"] = sanitized_certs or DEFAULT_CAREER_COACH_SCHEMA["Recommended_Certifications"]
+
+    # Internship Suggestions
+    interns = data.get("Internship_Suggestions", [])
+    sanitized_int = []
+    if isinstance(interns, list):
+        for item in interns:
+            if isinstance(item, dict):
+                sanitized_int.append({
+                    "Track": str(item.get("Track", "Technical Internship")).strip(),
+                    "Company_Types": str(item.get("Company_Types", "Tech Companies")).strip(),
+                    "Key_Focus": str(item.get("Key_Focus", "Practical Experience")).strip()
+                })
+    sanitized["Internship_Suggestions"] = sanitized_int or DEFAULT_CAREER_COACH_SCHEMA["Internship_Suggestions"]
+
+    # Company Recommendations
+    comps = data.get("Company_Recommendations", [])
+    sanitized_comp = []
+    if isinstance(comps, list):
+        for item in comps:
+            if isinstance(item, dict):
+                sanitized_comp.append({
+                    "Company": str(item.get("Company", "Target Tech Firm")).strip(),
+                    "Type": str(item.get("Type", "Growth Startup")).strip(),
+                    "Why_Fit": str(item.get("Why_Fit", "Strong alignment with candidate skills")).strip()
+                })
+    sanitized["Company_Recommendations"] = sanitized_comp or DEFAULT_CAREER_COACH_SCHEMA["Company_Recommendations"]
 
     return sanitized
