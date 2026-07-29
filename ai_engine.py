@@ -199,9 +199,7 @@ TARGET JOB DESCRIPTION:
 
 def rewrite_resume(resume_text: str) -> Dict[str, Any]:
     """
-    Rewrites and transforms resume text into an optimized, ATS-friendly version with
-    quantified action-verb bullet points across Professional Summary, Skills, Experience,
-    Projects, Achievements, and Education.
+    Rewrites and transforms resume text into an optimized, ATS-friendly version.
     """
     if not resume_text or not resume_text.strip():
         return sanitize_rewrite_data(DEFAULT_REWRITE_SCHEMA)
@@ -210,11 +208,6 @@ def rewrite_resume(resume_text: str) -> Dict[str, Any]:
 You are a Master ATS Resume Writer, Professional Executive Editor, and Talent AI Coach.
 
 Transform and rewrite the candidate resume provided below into a high-impact, ATS-optimized resume.
-
-CRITICAL REWRITING RULES:
-1. Generate strong, action-verb-led bullet points for all experience and project entries (e.g. "Engineered...", "Optimized...", "Architected...").
-2. Include quantified metrics and ROI estimates where possible (e.g., "boosted throughput by 35%").
-3. Format Professional Summary, Skills, Experience, Projects, Key Achievements, and Education.
 
 Return ONLY raw valid JSON matching this exact structure:
 
@@ -228,8 +221,7 @@ Return ONLY raw valid JSON matching this exact structure:
       "Duration": "2021 - Present",
       "Bullet_Points": [
         "Architected scalable microservices infrastructure handling 50M+ daily API calls using Go and Docker",
-        "Optimized database query performance by 45% using PostgreSQL index tuning and Redis caching",
-        "Mentored a cross-functional team of 6 junior engineers on CI/CD GitOps best practices"
+        "Optimized database query performance by 45% using PostgreSQL index tuning and Redis caching"
       ]
     }}
   ],
@@ -238,14 +230,12 @@ Return ONLY raw valid JSON matching this exact structure:
       "Title": "Real-Time Analytics Pipeline",
       "TechStack": "Python, Apache Kafka, PyTorch",
       "Bullet_Points": [
-        "Designed real-time event streaming pipeline processing 10k events/sec with sub-50ms latency",
-        "Integrated AI sentiment classification model improving anomaly detection accuracy by 28%"
+        "Designed real-time event streaming pipeline processing 10k events/sec with sub-50ms latency"
       ]
     }}
   ],
   "Achievements": [
-    "Awarded Top Innovator 2024 for reducing cloud infrastructure expenditures by $120k annually",
-    "Authored core internal Python framework adopted across 15 engineering squads"
+    "Awarded Top Innovator 2024 for reducing cloud infrastructure expenditures by $120k annually"
   ],
   "Education": [
     {{
@@ -281,3 +271,89 @@ CANDIDATE RESUME TEXT TO REWRITE:
             return sanitize_rewrite_data(raw_data)
         except Exception:
             return sanitize_rewrite_data(DEFAULT_REWRITE_SCHEMA)
+
+
+def generate_builder_resume(user_inputs: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Takes user form inputs from the AI Resume Builder and uses Ollama (Llama 3.2 3B) to polish
+    and generate professional ATS-friendly bullet points across all sections.
+    """
+    prompt = f"""
+You are an expert ATS Resume Architect and Career AI Strategist.
+
+Refine and polish the user-submitted candidate details below into a professional, ATS-optimized resume structure.
+
+Generate action-verb-led bullet points, quantified metric achievements, and an executive professional summary.
+
+Return ONLY raw valid JSON matching this exact structure:
+
+{{
+  "Name": "{user_inputs.get('Name', 'Candidate Name')}",
+  "Email": "{user_inputs.get('Email', '')}",
+  "Phone": "{user_inputs.get('Phone', '')}",
+  "Location": "{user_inputs.get('Location', '')}",
+  "LinkedIn": "{user_inputs.get('LinkedIn', '')}",
+  "Professional_Summary": "Polished high-impact professional summary...",
+  "Skills": ["Skill 1", "Skill 2"],
+  "Experience": [
+    {{
+      "Company": "Company Name",
+      "Role": "Job Role",
+      "Duration": "2021 - Present",
+      "Bullet_Points": [
+        "Engineered scalable solution resulting in 30% performance boost",
+        "Led cross-functional team of engineers to deliver high-priority feature"
+      ]
+    }}
+  ],
+  "Projects": [
+    {{
+      "Title": "Project Title",
+      "TechStack": "Python, React",
+      "Bullet_Points": [
+        "Architected full-stack web application serving 10k active users"
+      ]
+    }}
+  ],
+  "Certifications": [
+    {{
+      "Certificate": "Certification Title",
+      "Institution": "Issuing Body"
+    }}
+  ],
+  "Education": [
+    {{
+      "Degree": "Degree Title",
+      "Institution": "University Name",
+      "Session": "2020 - 2024",
+      "Score": "3.8/4.0",
+      "Highlights": "Specialized in Computer Science & System Design"
+    }}
+  ]
+}}
+
+RAW USER SUBMITTED DRAFT DETAILS:
+{user_inputs}
+"""
+
+    try:
+        response = ollama.chat(
+            model=MODEL_NAME,
+            format="json",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        content = response.get("message", {}).get("content", "")
+        raw_data = parse_and_clean_json(content)
+        
+        # Merge contact info from user inputs if LLM didn't copy them
+        for field in ["Name", "Email", "Phone", "Location", "LinkedIn"]:
+            if not raw_data.get(field) and user_inputs.get(field):
+                raw_data[field] = user_inputs[field]
+                
+        return raw_data
+    except Exception:
+        # Fallback to direct user inputs structured cleanly
+        fallback = dict(user_inputs)
+        if "Skills" in fallback and isinstance(fallback["Skills"], str):
+            fallback["Skills"] = [s.strip() for s in fallback["Skills"].split(",") if s.strip()]
+        return fallback

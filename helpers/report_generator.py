@@ -9,9 +9,6 @@ def generate_pdf_report(resume_data: Dict[str, Any], jd_match_data: Optional[Dic
     """
     Generates a professional PDF executive report summarizing candidate analysis,
     Recruiter Verdict, Weighted ATS Score breakdown, skills, risks, recommendations, projects, and education.
-    
-    Returns:
-        bytes: PDF file binary content.
     """
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -416,6 +413,209 @@ def generate_improved_resume_pdf(improved_data: Dict[str, Any], candidate_name: 
             else:
                 story.append(Paragraph(f"• {edu}", body_style))
             story.append(Spacer(1, 4))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def generate_builder_resume_pdf(builder_data: Dict[str, Any], template_style: str = "Classic Executive") -> bytes:
+    """
+    Generates a template-styled PDF document for the AI Resume Builder.
+    Supports: Classic Executive, Modern Tech, Minimalist Clean, Creative Professional.
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
+
+    styles = getSampleStyleSheet()
+
+    # Template Color Themes
+    if template_style == "Modern Tech":
+        header_color = colors.HexColor('#059669')    # Emerald Green
+        accent_color = colors.HexColor('#0F172A')    # Slate
+    elif template_style == "Minimalist Clean":
+        header_color = colors.HexColor('#334155')    # Slate Blue
+        accent_color = colors.HexColor('#0F172A')
+    elif template_style == "Creative Professional":
+        header_color = colors.HexColor('#6366F1')    # Indigo
+        accent_color = colors.HexColor('#1E293B')
+    else:
+        # Default: Classic Executive
+        header_color = colors.HexColor('#1E3A8A')    # Classic Deep Blue
+        accent_color = colors.HexColor('#111827')
+
+    name_style = ParagraphStyle(
+        'BldName',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=24,
+        leading=28,
+        textColor=header_color,
+        alignment=1, # Center
+        spaceAfter=4
+    )
+
+    contact_style = ParagraphStyle(
+        'BldContact',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9,
+        leading=12,
+        textColor=colors.HexColor('#64748B'),
+        alignment=1,
+        spaceAfter=12
+    )
+
+    section_style = ParagraphStyle(
+        'BldSection',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=12,
+        leading=15,
+        textColor=header_color,
+        spaceBefore=10,
+        spaceAfter=4
+    )
+
+    body_style = ParagraphStyle(
+        'BldBody',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9,
+        leading=12.5,
+        textColor=accent_color
+    )
+
+    bold_style = ParagraphStyle(
+        'BldBold',
+        parent=body_style,
+        fontName='Helvetica-Bold'
+    )
+
+    story = []
+
+    # Name Header
+    name = builder_data.get("Name", "Candidate Name")
+    story.append(Paragraph(name, name_style))
+
+    # Contact Details Subtitle
+    email = builder_data.get("Email", "")
+    phone = builder_data.get("Phone", "")
+    location = builder_data.get("Location", "")
+    linkedin = builder_data.get("LinkedIn", "")
+    bits = [b for b in [email, phone, location, linkedin] if b]
+    if bits:
+        story.append(Paragraph(" | ".join(bits), contact_style))
+    
+    story.append(HRFlowable(width="100%", thickness=1, color=header_color, spaceAfter=10))
+
+    # Summary
+    summary = builder_data.get("Professional_Summary", "")
+    if summary:
+        story.append(Paragraph("Professional Summary", section_style))
+        story.append(Paragraph(summary, body_style))
+        story.append(Spacer(1, 8))
+
+    # Skills
+    skills = builder_data.get("Skills", [])
+    if skills:
+        story.append(Paragraph("Technical & Core Skills", section_style))
+        skills_text = " • ".join(skills) if isinstance(skills, list) else str(skills)
+        story.append(Paragraph(skills_text, body_style))
+        story.append(Spacer(1, 8))
+
+    # Experience
+    exp_list = builder_data.get("Experience", [])
+    if exp_list:
+        story.append(Paragraph("Professional Experience", section_style))
+        for exp in exp_list:
+            if isinstance(exp, dict):
+                comp = exp.get("Company", "Company")
+                role = exp.get("Role", "Role")
+                dur = exp.get("Duration", "")
+                header = f"<b>{role}</b> - {comp}"
+                if dur:
+                    header += f" ({dur})"
+                story.append(Paragraph(header, bold_style))
+
+                bullets = exp.get("Bullet_Points") or exp.get("Description") or []
+                if isinstance(bullets, list):
+                    for b in bullets:
+                        story.append(Paragraph(f"• {b}", body_style))
+                elif bullets:
+                    story.append(Paragraph(f"• {bullets}", body_style))
+            else:
+                story.append(Paragraph(f"• {exp}", body_style))
+            story.append(Spacer(1, 4))
+        story.append(Spacer(1, 6))
+
+    # Projects
+    proj_list = builder_data.get("Projects", [])
+    if proj_list:
+        story.append(Paragraph("Key Technical Projects", section_style))
+        for proj in proj_list:
+            if isinstance(proj, dict):
+                title = proj.get("Title", "Project")
+                tech = proj.get("TechStack", "")
+                header = f"<b>{title}</b>"
+                if tech:
+                    header += f" [{tech}]"
+                story.append(Paragraph(header, bold_style))
+
+                bullets = proj.get("Bullet_Points") or proj.get("Description") or []
+                if isinstance(bullets, list):
+                    for b in bullets:
+                        story.append(Paragraph(f"• {b}", body_style))
+                elif bullets:
+                    story.append(Paragraph(f"• {bullets}", body_style))
+            else:
+                story.append(Paragraph(f"• {proj}", body_style))
+            story.append(Spacer(1, 4))
+        story.append(Spacer(1, 6))
+
+    # Certifications
+    certs = builder_data.get("Certifications", [])
+    if certs:
+        story.append(Paragraph("Certifications & Credentials", section_style))
+        for cert in certs:
+            if isinstance(cert, dict):
+                ct = cert.get("Certificate", "Certification")
+                inst = cert.get("Institution", "")
+                line = f"<b>{ct}</b> - {inst}" if inst else ct
+            else:
+                line = str(cert)
+            story.append(Paragraph(f"🏅 {line}", body_style))
+        story.append(Spacer(1, 6))
+
+    # Education
+    edu_list = builder_data.get("Education", [])
+    if edu_list:
+        story.append(Paragraph("Education Credentials", section_style))
+        for edu in edu_list:
+            if isinstance(edu, dict):
+                deg = edu.get("Degree", "Degree")
+                inst = edu.get("Institution", "")
+                session = edu.get("Session", "")
+                score = edu.get("Score", "")
+                header = f"<b>{deg}</b> - {inst}"
+                if session:
+                    header += f" ({session})"
+                if score:
+                    header += f" | Score: {score}"
+                story.append(Paragraph(header, bold_style))
+                desc = edu.get("Description") or edu.get("Highlights")
+                if desc:
+                    story.append(Paragraph(f"• {desc}", body_style))
+            else:
+                story.append(Paragraph(f"• {edu}", body_style))
+            story.append(Spacer(1, 3))
 
     doc.build(story)
     buffer.seek(0)
