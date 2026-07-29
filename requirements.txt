@@ -1,10 +1,14 @@
-# Core
+# Core Web & Document Parsing
 streamlit>=1.30.0
 pdfplumber>=0.10.3
 PyMuPDF>=1.23.0
 plotly>=5.18.0
 reportlab>=4.0.0
 python-docx>=1.1.0
+
+# REST API & Database
+fastapi>=0.109.0
+uvicorn>=0.27.0
 
 # AI Provider: Ollama (local, no API key required)
 ollama>=0.1.6

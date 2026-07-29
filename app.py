@@ -12,6 +12,9 @@ from ai_engine import (
 from helpers.report_generator import generate_pdf_report
 from helpers.config_manager import load_config, get_current_provider_name, get_current_model
 from helpers.providers import PROVIDER_ICONS
+from helpers.auth import render_auth_header, render_auth_dialog, get_logged_in_user, get_user_role
+from database.db import save_resume_record
+
 from components.ui_styles import apply_custom_styles
 from components.dashboard import render_candidate_dashboard
 from components.skills_view import render_skills_and_insights
@@ -30,6 +33,13 @@ from components.settings_view import render_settings
 from components.interview_view import render_interview_prep_section
 from components.portfolio_view import render_portfolio_analyzer_section
 from components.career_coach_view import render_career_coach_section
+from components.recruiter_dashboard import render_recruiter_dashboard
+from components.candidate_comparison import render_candidate_comparison_section
+from components.candidate_portal import render_candidate_portal
+from components.interview_scheduler import render_interview_scheduler_section
+from components.enterprise_analytics import render_enterprise_analytics_section
+from components.admin_panel import render_admin_panel
+from components.company_profiles import render_company_profiles_section
 
 # Load AI provider config from .env / session state on every cold start
 load_config()
@@ -49,20 +59,33 @@ st.set_page_config(
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("""
-    <div style="text-align: center; padding: 10px 0 20px 0;">
-        <h2 style="margin: 0; background: linear-gradient(135deg, #3B82F6 0%, #6366F1 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+    <div style="text-align: center; padding: 10px 0 15px 0;">
+        <h2 style="margin: 0; background: linear-gradient(135deg, #3B82F6 0%, #EC4899 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
             ⚡ ResuMind AI
         </h2>
-        <span class="enterprise-badge">DUAL ATS SUITE v4.0</span>
+        <span class="enterprise-badge">ENTERPRISE RECRUITMENT PLATFORM v9.0</span>
     </div>
     """, unsafe_allow_html=True)
     
     # Primary Application Suite Mode Switcher
     suite_mode = st.radio(
         "🚀 Select Application Suite",
-        ["🔍 AI Resume Analyzer", "📝 AI Resume Builder", "🌐 Portfolio Analyzer", "🧭 AI Career Coach", "⚙️ AI Settings"],
+        [
+            "🔍 AI Resume Analyzer",
+            "💼 Recruiter Dashboard",
+            "📊 Candidate Comparison",
+            "👤 Candidate Portal",
+            "📅 Interview Scheduler",
+            "📈 Enterprise Analytics",
+            "🏢 Company Profiles",
+            "📝 AI Resume Builder",
+            "🌐 Portfolio Analyzer",
+            "🧭 AI Career Coach",
+            "👑 Admin Panel",
+            "⚙️ AI Settings"
+        ],
         index=0,
-        help="Switch between analyzing a resume, building a new one, auditing your online portfolio, coaching your career, or configuring your AI provider."
+        help="Access candidate database, AI recruiter audit, interview scheduler, analytics, or resume tools."
     )
 
     # Active provider badge in sidebar
@@ -77,6 +100,11 @@ with st.sidebar:
         <span><strong style="color:#e2e8f0;">{_prov}</strong> / {_model}</span>
     </div>
     """, unsafe_allow_html=True)
+
+    st.divider()
+
+    # User Authentication Form in Sidebar
+    render_auth_dialog()
 
     st.divider()
 
@@ -111,58 +139,8 @@ with st.sidebar:
                 st.session_state.pop("jd_match_result", None)
                 st.session_state.pop("improved_resume_data", None)
                 st.rerun()
-
-        st.divider()
-
-        # Workflow Steps Widget
-        st.markdown("""
-        #### 🚀 Analyzer Workflow
-        1. **Upload** PDF Resume  
-        2. **AI Recruiter Audit**  
-        3. **Rewrite** ATS Resume  
-        4. **Match** Job Description  
-        5. **Export** PDF Reports  
-        """)
-    elif "Builder" in suite_mode:
-        uploaded_file = None
-        st.markdown("""
-        #### 🚀 Builder Workflow
-        1. **Fill** Candidate Details  
-        2. **Select** Resume Template  
-        3. **Generate** AI ATS Bullets  
-        4. **Preview** Live Resume  
-        5. **Export** PDF / Word DOCX  
-        """)
-    elif "Portfolio" in suite_mode:
-        uploaded_file = None
-        st.markdown("""
-        #### 🌐 Portfolio Workflow
-        1. **Provide** Profile URLs  
-        2. **Audit** GitHub Repos  
-        3. **Evaluate** LinkedIn  
-        4. **Inspect** Portfolio UI  
-        5. **Review** Recommendations  
-        """)
-    elif "Coach" in suite_mode:
-        uploaded_file = None
-        st.markdown("""
-        #### 🧭 Coach Workflow
-        1. **Set** Target Role  
-        2. **Generate** Career Plan  
-        3. **Review** Salary & Roles  
-        4. **Follow** Roadmap  
-        5. **Execute** Weekly Plan  
-        """)
     else:
-        # Settings mode
         uploaded_file = None
-        st.markdown("""
-        #### ⚙️ Settings
-        - Switch AI providers
-        - Enter API keys
-        - Test connection
-        - Save preferences
-        """)
 
 # Apply Custom Styles according to chosen theme
 apply_custom_styles(theme=current_theme)
@@ -171,13 +149,15 @@ apply_custom_styles(theme=current_theme)
 _active_provider_label = f"{PROVIDER_ICONS.get(get_current_provider_name(), '🤖')} Running {get_current_provider_name()} / {get_current_model()}"
 
 # -----------------------------------------------------------------------------
-# 3. Main Header Banner
+# 3. Main Header Banner & Auth Status Bar
 # -----------------------------------------------------------------------------
+render_auth_header()
+
 st.markdown(f"""
 <div class="app-header-container">
     <div>
-        <h1 class="app-header-title">📄 Enterprise AI Resume Analyzer, Builder & Career Suite</h1>
-        <p class="app-header-subtitle">Deep neural ATS recruitment audit, 8-category weighted scoring, AI resume rewriting, multi-template builder, and AI career coaching.</p>
+        <h1 class="app-header-title">📄 Enterprise AI Recruitment Platform</h1>
+        <p class="app-header-subtitle">Deep neural recruitment audit, candidate database, ATS ranking, interview scheduler, and enterprise talent analytics.</p>
     </div>
     <div>
         <span class="enterprise-badge">● {suite_mode}</span>
@@ -186,31 +166,40 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 4. Suite Controller
+# 4. Suite Controller Routing
 # -----------------------------------------------------------------------------
 
-# =============================================================================
-# SUITE A: AI SETTINGS
-# =============================================================================
 if "Settings" in suite_mode:
     render_settings()
 
-# =============================================================================
-# SUITE B: AI CAREER COACH
-# =============================================================================
+elif "Recruiter Dashboard" in suite_mode:
+    render_recruiter_dashboard()
+
+elif "Candidate Comparison" in suite_mode:
+    render_candidate_comparison_section()
+
+elif "Candidate Portal" in suite_mode:
+    render_candidate_portal()
+
+elif "Interview Scheduler" in suite_mode:
+    render_interview_scheduler_section()
+
+elif "Enterprise Analytics" in suite_mode:
+    render_enterprise_analytics_section()
+
+elif "Company Profiles" in suite_mode:
+    render_company_profiles_section()
+
+elif "Admin Panel" in suite_mode:
+    render_admin_panel()
+
 elif "Coach" in suite_mode:
     resume_text_context = st.session_state.get("resume_text", "")
     render_career_coach_section(resume_text_context, generate_career_coaching)
 
-# =============================================================================
-# SUITE C: PORTFOLIO ANALYZER
-# =============================================================================
 elif "Portfolio" in suite_mode:
     render_portfolio_analyzer_section(analyze_portfolio)
 
-# =============================================================================
-# SUITE D: AI RESUME BUILDER
-# =============================================================================
 elif "Builder" in suite_mode:
     render_resume_builder_section(generate_builder_resume)
 
@@ -242,7 +231,24 @@ else:
                     ai_response = analyze_resume(resume_text)
                     st.write("Calculating weighted ATS category scores and growth roadmap...")
                     st.session_state["ai_response"] = ai_response
-                    status.update(label="🎉 Recruiter AI Audit Complete!", state="complete", expanded=False)
+
+                    # Save record to database
+                    user = get_logged_in_user()
+                    user_id = user.get("id") if user else None
+                    save_resume_record(
+                        candidate_name=ai_response.get("Name", "Candidate"),
+                        email=ai_response.get("Email", ""),
+                        phone=ai_response.get("Phone", ""),
+                        ats_score=ai_response.get("ATS_Score", 0),
+                        verdict=ai_response.get("Recruiter_Verdict", "Under Review"),
+                        hiring_prob=ai_response.get("Hiring_Probability", "0%"),
+                        candidate_level=ai_response.get("Candidate_Level", "Not Specified"),
+                        raw_text=resume_text,
+                        full_json=ai_response,
+                        user_id=user_id
+                    )
+
+                    status.update(label="🎉 Recruiter AI Audit Complete & Saved to Database!", state="complete", expanded=False)
 
             ai_response = st.session_state.get("ai_response", {})
             candidate_name = ai_response.get("Name", "Candidate")
