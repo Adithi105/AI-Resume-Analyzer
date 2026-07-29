@@ -13,16 +13,17 @@ MODEL_NAME = "llama3.2:3b"
 def analyze_resume(resume_text: str) -> Dict[str, Any]:
     """
     Analyzes extracted resume text using Ollama (Llama 3.2 3B) acting as an Intelligent
-    ATS Recruiter and Executive Talent Specialist. Returns 16 rich recruiter intelligence
-    metrics in structured JSON.
+    ATS Recruiter. Evaluates candidate metrics and returns weighted ATS sub-scores across
+    8 categories (Skills, Projects, Education, Experience, Certifications, Formatting,
+    Keyword Match, Readability) and 16 recruiter intelligence metrics in structured JSON.
     """
     if not resume_text or not resume_text.strip():
         return sanitize_resume_data({"error": "Empty resume text."})
 
     prompt = f"""
-You are an expert Executive Talent Acquisition Partner, Chief Technical Recruiter, and Applicant Tracking System (ATS) Auditor.
+You are an expert Executive Talent Acquisition Partner, Chief Technical Recruiter, and Applicant Tracking System (ATS) Scoring Engine.
 
-Analyze the candidate resume provided below and act as an Intelligent ATS Recruiter.
+Analyze the candidate resume provided below and evaluate both general recruiter metrics and a weighted 8-category ATS breakdown.
 
 Return ONLY a valid raw JSON object matching this exact structure:
 
@@ -30,6 +31,16 @@ Return ONLY a valid raw JSON object matching this exact structure:
   "Name": "Candidate Full Name",
   "Email": "Email Address",
   "Phone": "Phone Number",
+  "ATS_Breakdown": {{
+    "Skills_Score": 85,
+    "Experience_Score": 80,
+    "Projects_Score": 90,
+    "Keyword_Match_Score": 82,
+    "Education_Score": 88,
+    "Formatting_Score": 95,
+    "Certifications_Score": 75,
+    "Readability_Score": 90
+  }},
   "Executive_Summary": "High-impact 2-3 sentence executive summary of the candidate's caliber, domain background, and overall positioning.",
   "Resume_Overview": "Concise 2-sentence summary of candidate professional background, years of experience, and key domain expertise.",
   "ATS_Score": 85,
@@ -92,10 +103,9 @@ Return ONLY a valid raw JSON object matching this exact structure:
 
 CRITICAL INSTRUCTIONS:
 1. Return strictly raw valid JSON. Do NOT use markdown ```json wrappers or introductory text.
-2. ATS_Score must be an integer between 0 and 100 calculated rigorously.
+2. Provide numeric values (0-100) for all 8 categories in ATS_Breakdown (Skills_Score, Experience_Score, Projects_Score, Keyword_Match_Score, Education_Score, Formatting_Score, Certifications_Score, Readability_Score).
 3. Recruiter_Verdict must be one of: "Strong Hire", "Shortlist / Interview", "Borderline Candidate", or "Reject / Re-align".
 4. Hiring_Probability must be a percentage string (e.g., "85%").
-5. Candidate_Level must evaluate candidate seniority (e.g., "Junior", "Mid-Level", "Senior", "Lead / Principal").
 
 CANDIDATE RESUME TEXT:
 {resume_text}

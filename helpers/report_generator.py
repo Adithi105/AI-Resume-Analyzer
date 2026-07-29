@@ -8,7 +8,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 def generate_pdf_report(resume_data: Dict[str, Any], jd_match_data: Optional[Dict[str, Any]] = None) -> bytes:
     """
     Generates a professional PDF executive report summarizing candidate analysis,
-    Recruiter Verdict, Executive Summary, ATS score, skills, risks, recommendations, projects, and education.
+    Recruiter Verdict, Weighted ATS Score breakdown, skills, risks, recommendations, projects, and education.
     
     Returns:
         bytes: PDF file binary content.
@@ -75,7 +75,7 @@ def generate_pdf_report(resume_data: Dict[str, Any], jd_match_data: Optional[Dic
 
     # Title Banner
     story.append(Paragraph("Intelligent ATS Recruiter Audit Report", title_style))
-    story.append(Paragraph("Executive Resume Audit, Recruiter Verdict & Development Roadmap", subtitle_style))
+    story.append(Paragraph("Executive Resume Audit, Weighted ATS Score Breakdown & Development Roadmap", subtitle_style))
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#3B82F6'), spaceAfter=12))
 
     # Candidate Overview Table
@@ -90,7 +90,7 @@ def generate_pdf_report(resume_data: Dict[str, Any], jd_match_data: Optional[Dic
     summary_data = [
         [
             Paragraph(f"<b>Candidate Name:</b> {name}", body_style),
-            Paragraph(f"<b>ATS Score:</b> <font color='#2563EB'><b>{ats_score} / 100</b></font>", body_style)
+            Paragraph(f"<b>Overall Weighted ATS Score:</b> <font color='#2563EB'><b>{ats_score} / 100</b></font>", body_style)
         ],
         [
             Paragraph(f"<b>Email:</b> {email}", body_style),
@@ -118,6 +118,47 @@ def generate_pdf_report(resume_data: Dict[str, Any], jd_match_data: Optional[Dic
     ]))
     story.append(summary_table)
     story.append(Spacer(1, 10))
+
+    # Weighted ATS Breakdown Table
+    breakdown = resume_data.get("ATS_Breakdown", {})
+    if isinstance(breakdown, dict) and breakdown:
+        story.append(Paragraph("Weighted ATS Category Breakdown", section_heading))
+        cats_data = [
+            [
+                Paragraph("<b>Category</b>", bold_label),
+                Paragraph("<b>Weight</b>", bold_label),
+                Paragraph("<b>Score</b>", bold_label),
+                Paragraph("<b>Category</b>", bold_label),
+                Paragraph("<b>Weight</b>", bold_label),
+                Paragraph("<b>Score</b>", bold_label)
+            ],
+            [
+                Paragraph("Skills", body_style), Paragraph("25%", body_style), Paragraph(f"<b>{breakdown.get('Skills_Score', 0)}%</b>", body_style),
+                Paragraph("Experience", body_style), Paragraph("25%", body_style), Paragraph(f"<b>{breakdown.get('Experience_Score', 0)}%</b>", body_style)
+            ],
+            [
+                Paragraph("Projects", body_style), Paragraph("15%", body_style), Paragraph(f"<b>{breakdown.get('Projects_Score', 0)}%</b>", body_style),
+                Paragraph("Keyword Match", body_style), Paragraph("15%", body_style), Paragraph(f"<b>{breakdown.get('Keyword_Match_Score', 0)}%</b>", body_style)
+            ],
+            [
+                Paragraph("Education", body_style), Paragraph("10%", body_style), Paragraph(f"<b>{breakdown.get('Education_Score', 0)}%</b>", body_style),
+                Paragraph("Formatting", body_style), Paragraph("5%", body_style), Paragraph(f"<b>{breakdown.get('Formatting_Score', 0)}%</b>", body_style)
+            ],
+            [
+                Paragraph("Certifications", body_style), Paragraph("3%", body_style), Paragraph(f"<b>{breakdown.get('Certifications_Score', 0)}%</b>", body_style),
+                Paragraph("Readability", body_style), Paragraph("2%", body_style), Paragraph(f"<b>{breakdown.get('Readability_Score', 0)}%</b>", body_style)
+            ]
+        ]
+        breakdown_table = Table(cats_data, colWidths=[120, 50, 95, 120, 50, 95])
+        breakdown_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#EFF6FF')),
+            ('PADDING', (0, 0), (-1, -1), 5),
+            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#CBD5E1')),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        story.append(breakdown_table)
+        story.append(Spacer(1, 10))
 
     # Executive Summary & Overview
     exec_summary = resume_data.get("Executive_Summary", "")

@@ -1,6 +1,7 @@
 import json
 import re
 from typing import Dict, Any
+from helpers.scoring_engine import compute_weighted_ats_score
 
 DEFAULT_RESUME_SCHEMA: Dict[str, Any] = {
     # Core Candidate Info
@@ -9,6 +10,19 @@ DEFAULT_RESUME_SCHEMA: Dict[str, Any] = {
     "Phone": "Not Specified",
     "ATS_Score": 0,
     
+    # Weighted ATS Breakdown
+    "ATS_Breakdown": {
+        "Overall_ATS_Score": 0,
+        "Skills_Score": 0,
+        "Experience_Score": 0,
+        "Projects_Score": 0,
+        "Keyword_Match_Score": 0,
+        "Education_Score": 0,
+        "Formatting_Score": 0,
+        "Certifications_Score": 0,
+        "Readability_Score": 0
+    },
+
     # Recruiter Decision & Overview
     "Executive_Summary": "Not Provided",
     "Resume_Overview": "Not Provided",
@@ -107,7 +121,7 @@ def parse_and_clean_json(raw_response: str) -> Dict[str, Any]:
 def sanitize_resume_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Ensures all keys in DEFAULT_RESUME_SCHEMA exist, have correct types,
-    and contain no None values.
+    and contain no None values. Computes professional weighted ATS breakdown.
     """
     sanitized = {}
 
@@ -124,14 +138,7 @@ def sanitize_resume_data(data: Dict[str, Any]) -> Dict[str, Any]:
         else:
             sanitized[field] = str(val).strip()
 
-    # Numeric score field
-    try:
-        score = int(data.get("ATS_Score", 0))
-        sanitized["ATS_Score"] = max(0, min(100, score))
-    except (ValueError, TypeError):
-        sanitized["ATS_Score"] = 0
-
-    # List fields (simple string lists)
+    # List fields
     list_fields = [
         "Skills", "Technical_Strengths", "Soft_Skill_Strengths", "Strengths",
         "Weaknesses", "Missing_Skills", "Resume_Risks",
@@ -161,6 +168,13 @@ def sanitize_resume_data(data: Dict[str, Any]) -> Dict[str, Any]:
         sanitized["Career_Suggestions"] = list(sanitized["Suggestions"])
     elif not sanitized["Suggestions"] and sanitized["Career_Suggestions"]:
         sanitized["Suggestions"] = list(sanitized["Career_Suggestions"])
+
+    # Compute Weighted ATS Breakdown & Overall Score
+    data_copy = dict(data)
+    data_copy.update(sanitized)
+    ats_breakdown = compute_weighted_ats_score(data_copy)
+    sanitized["ATS_Breakdown"] = ats_breakdown
+    sanitized["ATS_Score"] = ats_breakdown["Overall_ATS_Score"]
 
     return sanitized
 
