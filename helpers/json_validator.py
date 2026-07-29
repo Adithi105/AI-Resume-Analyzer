@@ -306,8 +306,115 @@ def sanitize_interview_data(data: Dict[str, Any]) -> Dict[str, Any]:
     summary = data.get("Score_Summary", "")
     sanitized["Score_Summary"] = str(summary).strip() if summary else DEFAULT_INTERVIEW_SCHEMA["Score_Summary"]
 
-    # Question categories
-    for cat_key in _QUESTION_CATEGORIES:
-        sanitized[cat_key] = _sanitize_question_list(data.get(cat_key, []))
+# ─────────────────────────────────────────────────────────────────────────────
+# Portfolio Analyzer Schema & Sanitizer
+# ─────────────────────────────────────────────────────────────────────────────
+
+DEFAULT_PORTFOLIO_SCHEMA: Dict[str, Any] = {
+    "Overall_Portfolio_Score": 0,
+    "GitHub_Score": 0,
+    "LinkedIn_Score": 0,
+    "Portfolio_Website_Score": 0,
+    "Metrics_Breakdown": {
+        "Repository_Quality": 0,
+        "Project_Quality": 0,
+        "Contribution_Activity": 0,
+        "Code_Documentation": 0,
+        "Profile_Completeness": 0,
+        "UI_UX_Design": 0
+    },
+    "GitHub_Analysis": {
+        "Repository_Quality": "Analysis of open-source repository organization, commit cadence, and code structure.",
+        "Top_Languages": ["Python", "JavaScript"],
+        "Highlights": ["Clean README files", "Consistent commit frequency"],
+        "Risks": ["Few test files in repositories"]
+    },
+    "LinkedIn_Analysis": {
+        "Profile_Completeness": "Evaluation of summary, experience bullets, endorsement density, and network signals.",
+        "Strengths": ["Clear headline", "Detailed experience entries"],
+        "Gaps": ["Sparse recommendation section"]
+    },
+    "Portfolio_Website_Analysis": {
+        "Design_Quality": "Evaluation of UI/UX aesthetics, responsiveness, project showcases, and live demos.",
+        "Strengths": ["Clean layout", "Fast load time"],
+        "Areas_For_Improvement": ["Add live hosted project links"]
+    },
+    "Contribution_Analysis": "Detailed analysis of open-source contribution patterns, commit consistency, and project ownership.",
+    "Improvement_Suggestions": ["Add comprehensive READMEs to top 3 repos", "Include live demo links on portfolio"],
+    "Technology_Recommendations": ["Learn Docker & CI/CD workflows", "Add TypeScript to portfolio projects"]
+}
+
+
+def sanitize_portfolio_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Validates and normalises Portfolio Analyzer AI responses.
+    Ensures scores, sub-breakdowns, and diagnostic analysis sections are safe.
+    """
+    sanitized: Dict[str, Any] = {}
+
+    # Score helper
+    def _safe_score(val: Any) -> int:
+        try:
+            return max(0, min(100, int(val)))
+        except (ValueError, TypeError):
+            return 0
+
+    sanitized["Overall_Portfolio_Score"] = _safe_score(data.get("Overall_Portfolio_Score", 0))
+    sanitized["GitHub_Score"] = _safe_score(data.get("GitHub_Score", 0))
+    sanitized["LinkedIn_Score"] = _safe_score(data.get("LinkedIn_Score", 0))
+    sanitized["Portfolio_Website_Score"] = _safe_score(data.get("Portfolio_Website_Score", 0))
+
+    # Metrics Breakdown
+    raw_mb = data.get("Metrics_Breakdown", {})
+    sanitized["Metrics_Breakdown"] = {
+        "Repository_Quality": _safe_score(raw_mb.get("Repository_Quality", 0)),
+        "Project_Quality": _safe_score(raw_mb.get("Project_Quality", 0)),
+        "Contribution_Activity": _safe_score(raw_mb.get("Contribution_Activity", 0)),
+        "Code_Documentation": _safe_score(raw_mb.get("Code_Documentation", 0)),
+        "Profile_Completeness": _safe_score(raw_mb.get("Profile_Completeness", 0)),
+        "UI_UX_Design": _safe_score(raw_mb.get("UI_UX_Design", 0)),
+    }
+
+    # Re-calculate overall score if missing/0
+    if sanitized["Overall_Portfolio_Score"] == 0:
+        mb = sanitized["Metrics_Breakdown"]
+        avg = sum(mb.values()) / max(1, len(mb))
+        sanitized["Overall_Portfolio_Score"] = round(avg)
+
+    # Sub-analyses
+    gh = data.get("GitHub_Analysis", {})
+    sanitized["GitHub_Analysis"] = {
+        "Repository_Quality": str(gh.get("Repository_Quality", DEFAULT_PORTFOLIO_SCHEMA["GitHub_Analysis"]["Repository_Quality"])).strip(),
+        "Top_Languages": [str(x) for x in gh.get("Top_Languages", []) if x] or DEFAULT_PORTFOLIO_SCHEMA["GitHub_Analysis"]["Top_Languages"],
+        "Highlights": [str(x) for x in gh.get("Highlights", []) if x] or DEFAULT_PORTFOLIO_SCHEMA["GitHub_Analysis"]["Highlights"],
+        "Risks": [str(x) for x in gh.get("Risks", []) if x] or DEFAULT_PORTFOLIO_SCHEMA["GitHub_Analysis"]["Risks"],
+    }
+
+    li = data.get("LinkedIn_Analysis", {})
+    sanitized["LinkedIn_Analysis"] = {
+        "Profile_Completeness": str(li.get("Profile_Completeness", DEFAULT_PORTFOLIO_SCHEMA["LinkedIn_Analysis"]["Profile_Completeness"])).strip(),
+        "Strengths": [str(x) for x in li.get("Strengths", []) if x] or DEFAULT_PORTFOLIO_SCHEMA["LinkedIn_Analysis"]["Strengths"],
+        "Gaps": [str(x) for x in li.get("Gaps", []) if x] or DEFAULT_PORTFOLIO_SCHEMA["LinkedIn_Analysis"]["Gaps"],
+    }
+
+    pw = data.get("Portfolio_Website_Analysis", {})
+    sanitized["Portfolio_Website_Analysis"] = {
+        "Design_Quality": str(pw.get("Design_Quality", DEFAULT_PORTFOLIO_SCHEMA["Portfolio_Website_Analysis"]["Design_Quality"])).strip(),
+        "Strengths": [str(x) for x in pw.get("Strengths", []) if x] or DEFAULT_PORTFOLIO_SCHEMA["Portfolio_Website_Analysis"]["Strengths"],
+        "Areas_For_Improvement": [str(x) for x in pw.get("Areas_For_Improvement", []) if x] or DEFAULT_PORTFOLIO_SCHEMA["Portfolio_Website_Analysis"]["Areas_For_Improvement"],
+    }
+
+    # Main text & list fields
+    ca = data.get("Contribution_Analysis")
+    sanitized["Contribution_Analysis"] = str(ca).strip() if ca else DEFAULT_PORTFOLIO_SCHEMA["Contribution_Analysis"]
+
+    for list_field in ["Improvement_Suggestions", "Technology_Recommendations"]:
+        raw_list = data.get(list_field)
+        if isinstance(raw_list, list):
+            sanitized[list_field] = [str(x).strip() for x in raw_list if x]
+        elif raw_list:
+            sanitized[list_field] = [str(raw_list).strip()]
+        else:
+            sanitized[list_field] = list(DEFAULT_PORTFOLIO_SCHEMA[list_field])
 
     return sanitized

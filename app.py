@@ -1,6 +1,13 @@
 import streamlit as st
 from utils import extract_text_from_pdf
-from ai_engine import analyze_resume, compare_resume_with_jd, rewrite_resume, generate_builder_resume, generate_interview_prep
+from ai_engine import (
+    analyze_resume,
+    compare_resume_with_jd,
+    rewrite_resume,
+    generate_builder_resume,
+    generate_interview_prep,
+    analyze_portfolio
+)
 from helpers.report_generator import generate_pdf_report
 from helpers.config_manager import load_config, get_current_provider_name, get_current_model
 from helpers.providers import PROVIDER_ICONS
@@ -20,6 +27,7 @@ from components.rewriter_view import render_resume_rewriter_section
 from components.builder_view import render_resume_builder_section
 from components.settings_view import render_settings
 from components.interview_view import render_interview_prep_section
+from components.portfolio_view import render_portfolio_analyzer_section
 
 # Load AI provider config from .env / session state on every cold start
 load_config()
@@ -50,9 +58,9 @@ with st.sidebar:
     # Primary Application Suite Mode Switcher
     suite_mode = st.radio(
         "🚀 Select Application Suite",
-        ["🔍 AI Resume Analyzer", "📝 AI Resume Builder", "⚙️ AI Settings"],
+        ["🔍 AI Resume Analyzer", "📝 AI Resume Builder", "🌐 Portfolio Analyzer", "⚙️ AI Settings"],
         index=0,
-        help="Switch between analyzing a resume, building a new one, or configuring your AI provider."
+        help="Switch between analyzing a resume, building a new one, auditing your online portfolio, or configuring your AI provider."
     )
 
     # Active provider badge in sidebar
@@ -82,7 +90,7 @@ with st.sidebar:
     st.divider()
 
     # Analyzer Controls (Only show when in Analyzer Suite)
-    if "Analyzer" in suite_mode:
+    if "Analyzer" in suite_mode and "Portfolio" not in suite_mode:
         st.markdown("### 📥 Document Upload")
         uploaded_file = st.file_uploader(
             "Upload Candidate Resume (PDF)",
@@ -123,6 +131,16 @@ with st.sidebar:
         4. **Preview** Live Resume  
         5. **Export** PDF / Word DOCX  
         """)
+    elif "Portfolio" in suite_mode:
+        uploaded_file = None
+        st.markdown("""
+        #### 🌐 Portfolio Workflow
+        1. **Provide** Profile URLs  
+        2. **Audit** GitHub Repos  
+        3. **Evaluate** LinkedIn  
+        4. **Inspect** Portfolio UI  
+        5. **Review** Recommendations  
+        """)
     else:
         # Settings mode
         uploaded_file = None
@@ -146,11 +164,11 @@ _active_provider_label = f"{PROVIDER_ICONS.get(get_current_provider_name(), '�
 st.markdown(f"""
 <div class="app-header-container">
     <div>
-        <h1 class="app-header-title">📄 Enterprise AI Resume Analyzer & Builder Suite</h1>
-        <p class="app-header-subtitle">Deep neural ATS recruitment audit, 8-category weighted scoring, AI resume rewriting, and interactive multi-template resume builder.</p>
+        <h1 class="app-header-title">📄 Enterprise AI Resume Analyzer, Builder & Portfolio Suite</h1>
+        <p class="app-header-subtitle">Deep neural ATS recruitment audit, 8-category weighted scoring, AI resume rewriting, multi-template builder, and online portfolio quality analysis.</p>
     </div>
     <div>
-        <span class="enterprise-badge">● {'Analyzer Active' if 'Analyzer' in suite_mode else 'Builder Active'}</span>
+        <span class="enterprise-badge">● {suite_mode}</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -166,7 +184,13 @@ if "Settings" in suite_mode:
     render_settings()
 
 # =============================================================================
-# SUITE B: AI RESUME BUILDER
+# SUITE B: PORTFOLIO ANALYZER
+# =============================================================================
+elif "Portfolio" in suite_mode:
+    render_portfolio_analyzer_section(analyze_portfolio)
+
+# =============================================================================
+# SUITE C: AI RESUME BUILDER
 # =============================================================================
 elif "Builder" in suite_mode:
     render_resume_builder_section(generate_builder_resume)

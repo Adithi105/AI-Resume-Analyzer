@@ -12,10 +12,12 @@ from helpers.json_validator import (
     sanitize_jd_match_data,
     sanitize_rewrite_data,
     sanitize_interview_data,
+    sanitize_portfolio_data,
     DEFAULT_RESUME_SCHEMA,
     DEFAULT_JD_MATCH_SCHEMA,
     DEFAULT_REWRITE_SCHEMA,
-    DEFAULT_INTERVIEW_SCHEMA
+    DEFAULT_INTERVIEW_SCHEMA,
+    DEFAULT_PORTFOLIO_SCHEMA
 )
 
 
@@ -465,6 +467,68 @@ def generate_builder_resume(user_inputs: Dict[str, Any]) -> Dict[str, Any]:
         return fallback
 
 
+_PORTFOLIO_PROMPT = """
+You are an expert Developer Advocate, Technical Recruiter, and Engineering Brand Architect.
+
+Analyze the developer's candidate profile across their GitHub Profile, LinkedIn Profile, and Portfolio Website.
+
+Evaluate scores (0-100), repository quality, project complexity, open-source contribution activity, profile completeness, design/UI quality, improvement suggestions, and technology recommendations.
+
+Return ONLY raw valid JSON conforming strictly to this format:
+
+{{
+  "Overall_Portfolio_Score": 88,
+  "GitHub_Score": 85,
+  "LinkedIn_Score": 90,
+  "Portfolio_Website_Score": 89,
+  "Metrics_Breakdown": {{
+    "Repository_Quality": 84,
+    "Project_Quality": 88,
+    "Contribution_Activity": 82,
+    "Code_Documentation": 90,
+    "Profile_Completeness": 92,
+    "UI_UX_Design": 86
+  }},
+  "GitHub_Analysis": {{
+    "Repository_Quality": "Repositories display good architectural structure, clear directory organization, and informative README files.",
+    "Top_Languages": ["Python", "TypeScript", "Go", "Docker"],
+    "Highlights": ["Comprehensive README documentation with usage instructions", "Consistent commit history on main projects"],
+    "Risks": ["A few repositories lack unit test coverage or CI workflow files"]
+  }},
+  "LinkedIn_Analysis": {{
+    "Profile_Completeness": "Profile is well structured with executive summary, detailed experience entries, and relevant technical skill endorsements.",
+    "Strengths": ["High-impact headline summarizing domain expertise", "Quantified achievement metrics across past roles"],
+    "Gaps": ["Sparse recommendation entries from peers/managers"]
+  }},
+  "Portfolio_Website_Analysis": {{
+    "Design_Quality": "Modern responsive layout with clean visual hierarchy, clear call to action, and interactive project cards.",
+    "Strengths": ["Sleek dark/light theme", "Direct links to live hosted demos"],
+    "Areas_For_Improvement": ["Add dynamic project search/filter by tech stack"]
+  }},
+  "Contribution_Analysis": "Candidate maintains steady open-source contribution activity with strong project ownership, clear commit messages, and good pull request etiquette.",
+  "Improvement_Suggestions": [
+    "Add GitHub Actions CI/CD workflows to top 3 public repositories",
+    "Include a video walk-through or GIF preview in project README files",
+    "Request 2-3 recommendations on LinkedIn from past tech leads or colleagues",
+    "Add dynamic filter tags by technology stack on your portfolio website"
+  ],
+  "Technology_Recommendations": [
+    "Adopt TypeScript for full-stack JavaScript projects for type safety",
+    "Integrate Docker Compose files into all backend repositories",
+    "Explore Kubernetes & Helm for cloud-native deployment demonstrations",
+    "Implement automated unit and integration tests using pytest/Jest"
+  ]
+}}
+
+CANDIDATE PORTFOLIO DETAILS:
+GitHub URL / Username: {github_url}
+LinkedIn Profile URL: {linkedin_url}
+Portfolio Website URL: {portfolio_url}
+Candidate Notes / Bio / Resume Context:
+{candidate_notes}
+"""
+
+
 def generate_interview_prep(resume_text: str, job_description: str = "") -> Dict[str, Any]:
     """
     Generates a tailored interview preparation package featuring Technical, HR,
@@ -485,3 +549,29 @@ def generate_interview_prep(resume_text: str, job_description: str = "") -> Dict
         return sanitize_interview_data(raw_data)
     except Exception:
         return sanitize_interview_data(DEFAULT_INTERVIEW_SCHEMA)
+
+
+def analyze_portfolio(
+    github_url: str = "",
+    linkedin_url: str = "",
+    portfolio_url: str = "",
+    candidate_notes: str = ""
+) -> Dict[str, Any]:
+    """
+    Analyzes candidate's GitHub Profile, LinkedIn Profile, and Portfolio Website to
+    generate comprehensive presence scores, repository quality, project quality,
+    contribution analysis, improvement suggestions, and technology recommendations.
+    """
+    prompt = _PORTFOLIO_PROMPT.format(
+        github_url=github_url if github_url.strip() else "Not Provided (Evaluate based on notes)",
+        linkedin_url=linkedin_url if linkedin_url.strip() else "Not Provided",
+        portfolio_url=portfolio_url if portfolio_url.strip() else "Not Provided",
+        candidate_notes=candidate_notes if candidate_notes.strip() else "No extra notes provided."
+    )
+
+    try:
+        content = _call_provider(prompt)
+        raw_data = parse_and_clean_json(content)
+        return sanitize_portfolio_data(raw_data)
+    except Exception:
+        return sanitize_portfolio_data(DEFAULT_PORTFOLIO_SCHEMA)
