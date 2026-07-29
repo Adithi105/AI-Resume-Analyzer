@@ -1,49 +1,61 @@
 import streamlit as st
 import plotly.graph_objects as go
-import plotly.express as px
 from typing import Dict, Any
 
-def render_ats_gauge_chart(score: int):
+def render_ats_gauge_chart(score: int, theme: str = "dark"):
     """
-    Renders an interactive Plotly Gauge meter for the ATS score.
+    Renders an interactive Plotly Gauge meter for the ATS score with theme support.
     """
+    is_dark = (theme == "dark")
+    text_color = "#F8FAFC" if is_dark else "#0F172A"
+    axis_tick_color = "#94A3B8" if is_dark else "#64748B"
+    bg_step_red = "rgba(239, 68, 68, 0.2)" if is_dark else "#FEE2E2"
+    bg_step_yellow = "rgba(245, 158, 11, 0.2)" if is_dark else "#FEF3C7"
+    bg_step_blue = "rgba(59, 130, 246, 0.2)" if is_dark else "#E0F2FE"
+    bg_step_green = "rgba(16, 185, 129, 0.25)" if is_dark else "#D1FAE5"
+
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=score,
         domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': "ATS Score Index", 'font': {'size': 20, 'color': "#1E293B"}},
+        number={'suffix': "%", 'font': {'size': 38, 'color': text_color, 'family': 'Plus Jakarta Sans, sans-serif'}},
+        title={'text': "Circular ATS Readiness Gauge", 'font': {'size': 18, 'color': text_color, 'family': 'Plus Jakarta Sans, sans-serif'}},
         gauge={
-            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#475569"},
-            'bar': {'color': "#2563EB"},
-            'bgcolor': "white",
-            'borderwidth': 2,
-            'bordercolor': "#CBD5E1",
+            'axis': {'range': [0, 100], 'tickwidth': 2, 'tickcolor': axis_tick_color, 'dtick': 20},
+            'bar': {'color': "#6366F1", 'thickness': 0.3},
+            'bgcolor': "rgba(0,0,0,0)",
+            'borderwidth': 1.5,
+            'bordercolor': "rgba(148, 163, 184, 0.3)",
             'steps': [
-                {'range': [0, 40], 'color': '#FEE2E2'},
-                {'range': [40, 60], 'color': '#FEF3C7'},
-                {'range': [60, 80], 'color': '#E0F2FE'},
-                {'range': [80, 100], 'color': '#D1FAE5'}
+                {'range': [0, 40], 'color': bg_step_red},
+                {'range': [40, 60], 'color': bg_step_yellow},
+                {'range': [60, 80], 'color': bg_step_blue},
+                {'range': [80, 100], 'color': bg_step_green}
             ],
             'threshold': {
-                'line': {'color': "#16A34A", 'width': 4},
-                'thickness': 0.75,
+                'line': {'color': "#10B981", 'width': 4},
+                'thickness': 0.8,
                 'value': 80
             }
         }
     ))
     
     fig.update_layout(
-        height=260,
-        margin=dict(l=20, r=20, t=40, b=20),
+        height=280,
+        margin=dict(l=30, r=30, t=50, b=20),
         paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter, sans-serif")
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Plus Jakarta Sans, sans-serif")
     )
     st.plotly_chart(fig, use_container_width=True)
 
-def render_skills_pie_chart(skills_count: int, missing_count: int, strengths_count: int):
+def render_skills_pie_chart(skills_count: int, missing_count: int, strengths_count: int, theme: str = "dark"):
     """
-    Renders a donut chart illustrating skill breakdown.
+    Renders a sleek donut chart illustrating skill breakdown.
     """
+    is_dark = (theme == "dark")
+    text_color = "#F8FAFC" if is_dark else "#0F172A"
+
     labels = ['Skills Found', 'Missing Skills', 'Key Strengths']
     values = [max(1, skills_count), max(0, missing_count), max(0, strengths_count)]
     colors = ['#10B981', '#EF4444', '#3B82F6']
@@ -51,26 +63,37 @@ def render_skills_pie_chart(skills_count: int, missing_count: int, strengths_cou
     fig = go.Figure(data=[go.Pie(
         labels=labels,
         values=values,
-        hole=.5,
+        hole=.6,
         marker_colors=colors,
         textinfo='label+percent',
-        insidetextorientation='radial'
+        insidetextorientation='radial',
+        textfont=dict(size=12, color="#FFFFFF" if is_dark else "#0F172A", family="Plus Jakarta Sans, sans-serif")
     )])
     
     fig.update_layout(
-        title_text="Resume Profile Distribution",
-        height=260,
-        margin=dict(l=20, r=20, t=40, b=20),
+        title_text="Resume Skill Matrix Breakdown",
+        title_font=dict(size=18, color=text_color, family="Plus Jakarta Sans, sans-serif"),
+        height=280,
+        margin=dict(l=30, r=30, t=50, b=20),
         paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter, sans-serif")
+        plot_bgcolor="rgba(0,0,0,0)",
+        legend=dict(
+            font=dict(color=text_color, family="Plus Jakarta Sans, sans-serif"),
+            orientation="h",
+            yanchor="bottom",
+            y=-0.2,
+            xanchor="center",
+            x=0.5
+        ),
+        font=dict(family="Plus Jakarta Sans, sans-serif")
     )
     st.plotly_chart(fig, use_container_width=True)
 
-def render_analytics_section(data: Dict[str, Any]):
+def render_analytics_section(data: Dict[str, Any], theme: str = "dark"):
     """
-    Renders combined analytics charts section.
+    Renders combined analytics charts section inside glass containers.
     """
-    st.subheader("📈 Analytics & Visual Metrics")
+    st.subheader("📈 ATS Analytics & Visual Metrics")
     col1, col2 = st.columns(2)
 
     ats_score = data.get("ATS_Score", 0)
@@ -79,7 +102,11 @@ def render_analytics_section(data: Dict[str, Any]):
     strengths = data.get("Strengths", [])
 
     with col1:
-        render_ats_gauge_chart(ats_score)
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        render_ats_gauge_chart(ats_score, theme=theme)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col2:
-        render_skills_pie_chart(len(skills), len(missing), len(strengths))
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        render_skills_pie_chart(len(skills), len(missing), len(strengths), theme=theme)
+        st.markdown('</div>', unsafe_allow_html=True)
