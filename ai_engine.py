@@ -1,4 +1,10 @@
-import ollama
+"""
+AI Engine — provider-agnostic interface for all AI inference calls.
+
+All functions delegate to the active provider resolved by config_manager,
+which may be Ollama, OpenAI, Gemini, or Claude. No provider-specific code
+lives in this file.
+"""
 from typing import Dict, Any
 from helpers.json_validator import (
     parse_and_clean_json,
@@ -10,18 +16,27 @@ from helpers.json_validator import (
     DEFAULT_REWRITE_SCHEMA
 )
 
-MODEL_NAME = "llama3.2:3b"
 
-def analyze_resume(resume_text: str) -> Dict[str, Any]:
-    """
-    Analyzes extracted resume text using Ollama (Llama 3.2 3B) acting as an Intelligent
-    ATS Recruiter. Evaluates candidate metrics and returns weighted ATS sub-scores across
-    8 categories and 16 recruiter intelligence metrics in structured JSON.
-    """
-    if not resume_text or not resume_text.strip():
-        return sanitize_resume_data({"error": "Empty resume text."})
+def _get_provider():
+    """Resolve the active provider from the current session config."""
+    from helpers.config_manager import get_active_provider
+    return get_active_provider()
 
-    prompt = f"""
+
+def _call_provider(prompt: str) -> str:
+    """
+    Send a prompt to the active provider and return the raw text response.
+    Raises on provider errors — callers are responsible for catching.
+    """
+    provider = _get_provider()
+    return provider.chat_completion(prompt)
+
+
+# ─────────────────────────────────────────────────────────────
+#  PROMPTS (unchanged from original — only dispatch layer changed)
+# ─────────────────────────────────────────────────────────────
+
+_ANALYZE_PROMPT = """
 You are an expert Executive Talent Acquisition Partner, Chief Technical Recruiter, and Applicant Tracking System (ATS) Scoring Engine.
 
 Analyze the candidate resume provided below and evaluate both general recruiter metrics and a weighted 8-category ATS breakdown.
@@ -111,46 +126,7 @@ CANDIDATE RESUME TEXT:
 {resume_text}
 """
 
-    try:
-        response = ollama.chat(
-            model=MODEL_NAME,
-            format="json",
-            messages=[{"role": "user", "content": prompt}]
-        )
-
-        content = response.get("message", {}).get("content", "")
-        raw_data = parse_and_clean_json(content)
-        sanitized = sanitize_resume_data(raw_data)
-        return sanitized
-
-    except Exception as e:
-        try:
-            response = ollama.chat(
-                model=MODEL_NAME,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            content = response.get("message", {}).get("content", "")
-            raw_data = parse_and_clean_json(content)
-            return sanitize_resume_data(raw_data)
-        except Exception:
-            fallback = dict(DEFAULT_RESUME_SCHEMA)
-            fallback["Executive_Summary"] = "Unable to connect to Ollama AI service. Fallback preview mode active."
-            fallback["Recruiter_Verdict"] = "Pending AI Service"
-            fallback["Suggestions"] = [
-                f"Ollama connection error ({str(e)}). Please ensure Ollama service is running (`ollama run llama3.2:3b`)."
-            ]
-            return sanitize_resume_data(fallback)
-
-
-def compare_resume_with_jd(resume_text: str, job_description: str) -> Dict[str, Any]:
-    """
-    Compares candidate resume text against a Job Description and returns match percentage,
-    matching skills, missing skills, and suggestions.
-    """
-    if not resume_text or not job_description:
-        return sanitize_jd_match_data(DEFAULT_JD_MATCH_SCHEMA)
-
-    prompt = f"""
+_JD_MATCH_PROMPT = """
 You are an expert HR Specialist & Applicant Tracking System (ATS) Job Match Engine.
 
 Compare the Candidate Resume against the target Job Description (JD).
@@ -174,37 +150,7 @@ TARGET JOB DESCRIPTION:
 {job_description}
 """
 
-    try:
-        response = ollama.chat(
-            model=MODEL_NAME,
-            format="json",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        content = response.get("message", {}).get("content", "")
-        raw_data = parse_and_clean_json(content)
-        return sanitize_jd_match_data(raw_data)
-
-    except Exception as e:
-        try:
-            response = ollama.chat(
-                model=MODEL_NAME,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            content = response.get("message", {}).get("content", "")
-            raw_data = parse_and_clean_json(content)
-            return sanitize_jd_match_data(raw_data)
-        except Exception:
-            return sanitize_jd_match_data(DEFAULT_JD_MATCH_SCHEMA)
-
-
-def rewrite_resume(resume_text: str) -> Dict[str, Any]:
-    """
-    Rewrites and transforms resume text into an optimized, ATS-friendly version.
-    """
-    if not resume_text or not resume_text.strip():
-        return sanitize_rewrite_data(DEFAULT_REWRITE_SCHEMA)
-
-    prompt = f"""
+_REWRITE_PROMPT = """
 You are a Master ATS Resume Writer, Professional Executive Editor, and Talent AI Coach.
 
 Transform and rewrite the candidate resume provided below into a high-impact, ATS-optimized resume.
@@ -251,34 +197,7 @@ CANDIDATE RESUME TEXT TO REWRITE:
 {resume_text}
 """
 
-    try:
-        response = ollama.chat(
-            model=MODEL_NAME,
-            format="json",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        content = response.get("message", {}).get("content", "")
-        raw_data = parse_and_clean_json(content)
-        return sanitize_rewrite_data(raw_data)
-    except Exception as e:
-        try:
-            response = ollama.chat(
-                model=MODEL_NAME,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            content = response.get("message", {}).get("content", "")
-            raw_data = parse_and_clean_json(content)
-            return sanitize_rewrite_data(raw_data)
-        except Exception:
-            return sanitize_rewrite_data(DEFAULT_REWRITE_SCHEMA)
-
-
-def generate_builder_resume(user_inputs: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Takes user form inputs from the AI Resume Builder and uses Ollama (Llama 3.2 3B) to polish
-    and generate professional ATS-friendly bullet points across all sections.
-    """
-    prompt = f"""
+_BUILDER_PROMPT = """
 You are an expert ATS Resume Architect and Career AI Strategist.
 
 Refine and polish the user-submitted candidate details below into a professional, ATS-optimized resume structure.
@@ -288,11 +207,11 @@ Generate action-verb-led bullet points, quantified metric achievements, and an e
 Return ONLY raw valid JSON matching this exact structure:
 
 {{
-  "Name": "{user_inputs.get('Name', 'Candidate Name')}",
-  "Email": "{user_inputs.get('Email', '')}",
-  "Phone": "{user_inputs.get('Phone', '')}",
-  "Location": "{user_inputs.get('Location', '')}",
-  "LinkedIn": "{user_inputs.get('LinkedIn', '')}",
+  "Name": "{name}",
+  "Email": "{email}",
+  "Phone": "{phone}",
+  "Location": "{location}",
+  "LinkedIn": "{linkedin}",
   "Professional_Summary": "Polished high-impact professional summary...",
   "Skills": ["Skill 1", "Skill 2"],
   "Experience": [
@@ -336,23 +255,102 @@ RAW USER SUBMITTED DRAFT DETAILS:
 {user_inputs}
 """
 
+
+# ─────────────────────────────────────────────────────────────
+#  PUBLIC API
+# ─────────────────────────────────────────────────────────────
+
+def analyze_resume(resume_text: str) -> Dict[str, Any]:
+    """
+    Analyzes extracted resume text using the active AI provider acting as an
+    Intelligent ATS Recruiter. Returns weighted ATS sub-scores across 8 categories
+    and 16 recruiter intelligence metrics in structured JSON.
+    """
+    if not resume_text or not resume_text.strip():
+        return sanitize_resume_data({"error": "Empty resume text."})
+
+    prompt = _ANALYZE_PROMPT.format(resume_text=resume_text)
+
     try:
-        response = ollama.chat(
-            model=MODEL_NAME,
-            format="json",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        content = response.get("message", {}).get("content", "")
+        content = _call_provider(prompt)
         raw_data = parse_and_clean_json(content)
-        
-        # Merge contact info from user inputs if LLM didn't copy them
+        return sanitize_resume_data(raw_data)
+    except Exception as e:
+        fallback = dict(DEFAULT_RESUME_SCHEMA)
+        fallback["Executive_Summary"] = (
+            f"AI provider error: {str(e)[:200]}. "
+            "Please check Settings → AI Provider and verify your API key or Ollama is running."
+        )
+        fallback["Recruiter_Verdict"] = "Pending AI Service"
+        fallback["Suggestions"] = [
+            "Go to Settings (⚙️ in sidebar) to configure or switch AI providers."
+        ]
+        return sanitize_resume_data(fallback)
+
+
+def compare_resume_with_jd(resume_text: str, job_description: str) -> Dict[str, Any]:
+    """
+    Compares candidate resume text against a Job Description and returns match
+    percentage, matching skills, missing skills, and suggestions.
+    """
+    if not resume_text or not job_description:
+        return sanitize_jd_match_data(DEFAULT_JD_MATCH_SCHEMA)
+
+    prompt = _JD_MATCH_PROMPT.format(
+        resume_text=resume_text,
+        job_description=job_description
+    )
+
+    try:
+        content = _call_provider(prompt)
+        raw_data = parse_and_clean_json(content)
+        return sanitize_jd_match_data(raw_data)
+    except Exception:
+        return sanitize_jd_match_data(DEFAULT_JD_MATCH_SCHEMA)
+
+
+def rewrite_resume(resume_text: str) -> Dict[str, Any]:
+    """
+    Rewrites and transforms resume text into an optimized, ATS-friendly version.
+    """
+    if not resume_text or not resume_text.strip():
+        return sanitize_rewrite_data(DEFAULT_REWRITE_SCHEMA)
+
+    prompt = _REWRITE_PROMPT.format(resume_text=resume_text)
+
+    try:
+        content = _call_provider(prompt)
+        raw_data = parse_and_clean_json(content)
+        return sanitize_rewrite_data(raw_data)
+    except Exception:
+        return sanitize_rewrite_data(DEFAULT_REWRITE_SCHEMA)
+
+
+def generate_builder_resume(user_inputs: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Takes user form inputs from the AI Resume Builder and uses the active provider
+    to polish and generate professional ATS-friendly bullet points across all sections.
+    """
+    prompt = _BUILDER_PROMPT.format(
+        name=user_inputs.get("Name", "Candidate Name"),
+        email=user_inputs.get("Email", ""),
+        phone=user_inputs.get("Phone", ""),
+        location=user_inputs.get("Location", ""),
+        linkedin=user_inputs.get("LinkedIn", ""),
+        user_inputs=user_inputs,
+    )
+
+    try:
+        content = _call_provider(prompt)
+        raw_data = parse_and_clean_json(content)
+
+        # Merge contact info from user inputs if provider didn't include them
         for field in ["Name", "Email", "Phone", "Location", "LinkedIn"]:
             if not raw_data.get(field) and user_inputs.get(field):
                 raw_data[field] = user_inputs[field]
-                
+
         return raw_data
     except Exception:
-        # Fallback to direct user inputs structured cleanly
         fallback = dict(user_inputs)
         if "Skills" in fallback and isinstance(fallback["Skills"], str):
             fallback["Skills"] = [s.strip() for s in fallback["Skills"].split(",") if s.strip()]

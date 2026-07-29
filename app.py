@@ -2,6 +2,8 @@ import streamlit as st
 from utils import extract_text_from_pdf
 from ai_engine import analyze_resume, compare_resume_with_jd, rewrite_resume, generate_builder_resume
 from helpers.report_generator import generate_pdf_report
+from helpers.config_manager import load_config, get_current_provider_name, get_current_model
+from helpers.providers import PROVIDER_ICONS
 from components.ui_styles import apply_custom_styles
 from components.dashboard import render_candidate_dashboard
 from components.skills_view import render_skills_and_insights
@@ -16,6 +18,10 @@ from components.match_view import render_jd_matching_section
 from components.recruiter_view import render_recruiter_insights
 from components.rewriter_view import render_resume_rewriter_section
 from components.builder_view import render_resume_builder_section
+from components.settings_view import render_settings
+
+# Load AI provider config from .env / session state on every cold start
+load_config()
 
 # -----------------------------------------------------------------------------
 # 1. Page Configuration & Custom CSS Injection
@@ -43,10 +49,23 @@ with st.sidebar:
     # Primary Application Suite Mode Switcher
     suite_mode = st.radio(
         "🚀 Select Application Suite",
-        ["🔍 AI Resume Analyzer", "📝 AI Resume Builder"],
+        ["🔍 AI Resume Analyzer", "📝 AI Resume Builder", "⚙️ AI Settings"],
         index=0,
-        help="Switch between analyzing an existing resume PDF or building a new resume from scratch."
+        help="Switch between analyzing a resume, building a new one, or configuring your AI provider."
     )
+
+    # Active provider badge in sidebar
+    _prov = get_current_provider_name()
+    _model = get_current_model()
+    _icon = PROVIDER_ICONS.get(_prov, "🤖")
+    st.markdown(f"""
+    <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+                border-radius:10px; padding:0.5rem 0.9rem; margin-top:0.4rem;
+                font-size:0.78rem; color:#94a3b8; display:flex; align-items:center; gap:0.5rem;">
+        <span style="font-size:1rem;">{_icon}</span>
+        <span><strong style="color:#e2e8f0;">{_prov}</strong> / {_model}</span>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.divider()
 
@@ -83,7 +102,7 @@ with st.sidebar:
                 st.rerun()
 
         st.divider()
-        
+
         # Workflow Steps Widget
         st.markdown("""
         #### 🚀 Analyzer Workflow
@@ -93,7 +112,7 @@ with st.sidebar:
         4. **Match** Job Description  
         5. **Export** PDF Reports  
         """)
-    else:
+    elif "Builder" in suite_mode:
         uploaded_file = None
         st.markdown("""
         #### 🚀 Builder Workflow
@@ -103,9 +122,22 @@ with st.sidebar:
         4. **Preview** Live Resume  
         5. **Export** PDF / Word DOCX  
         """)
+    else:
+        # Settings mode
+        uploaded_file = None
+        st.markdown("""
+        #### ⚙️ Settings
+        - Switch AI providers
+        - Enter API keys
+        - Test connection
+        - Save preferences
+        """)
 
 # Apply Custom Styles according to chosen theme
 apply_custom_styles(theme=current_theme)
+
+# Inject active provider into the audit status label dynamically
+_active_provider_label = f"{PROVIDER_ICONS.get(get_current_provider_name(), '🤖')} Running {get_current_provider_name()} / {get_current_model()}"
 
 # -----------------------------------------------------------------------------
 # 3. Main Header Banner
@@ -127,9 +159,15 @@ st.markdown(f"""
 # -----------------------------------------------------------------------------
 
 # =============================================================================
-# SUITE A: AI RESUME BUILDER
+# SUITE A: AI SETTINGS
 # =============================================================================
-if "Builder" in suite_mode:
+if "Settings" in suite_mode:
+    render_settings()
+
+# =============================================================================
+# SUITE B: AI RESUME BUILDER
+# =============================================================================
+elif "Builder" in suite_mode:
     render_resume_builder_section(generate_builder_resume)
 
 # =============================================================================
@@ -155,7 +193,7 @@ else:
         else:
             # Perform AI analysis if not already cached
             if "ai_response" not in st.session_state:
-                with st.status("🤖 Running Intelligent ATS Recruiter Audit (Llama 3.2 3B)...", expanded=True) as status:
+                with st.status(f"🤖 {_active_provider_label} — Running Intelligent ATS Recruiter Audit...", expanded=True) as status:
                     st.write("Evaluating executive summary, recruiter verdict, hiring probability, and candidate seniority level...")
                     ai_response = analyze_resume(resume_text)
                     st.write("Calculating weighted ATS category scores and growth roadmap...")
